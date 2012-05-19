@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">ATM</string>
+    <string name="Image">Image</string>
+    <string name="timerSecret">\?\?:\?\?</string>
+    <string name="OkButton">OK</string>
+
+</resources>
