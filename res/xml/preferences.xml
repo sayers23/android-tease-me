@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+    <EditTextPreference
+        android:key="Password"
+        android:password="true"
+        android:summary="Password to start app"
+        android:title="Password" />
+    <EditTextPreference
+        android:defaultValue="10"
+        android:key="FontSize"
+        android:summary="Font size to display screen"
+        android:title="Font Size" />
+    <CheckBoxPreference
+        android:key="Debug"
+        android:title="Debug"
+        android:summary="Turn debug features on"
+        android:defaultValue="false" />
+</PreferenceScreen>
