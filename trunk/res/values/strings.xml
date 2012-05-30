@@ -5,5 +5,8 @@
     <string name="Image">Image</string>
     <string name="timerSecret">\?\?:\?\?</string>
     <string name="OkButton">OK</string>
+    <string name="TagPage">TagPage</string>
+    <string name="TagSetFlags">TagSetFlags</string>
+    <string name="TagUnSetFlags">TagUnSetFlags</string>
 
 </resources>

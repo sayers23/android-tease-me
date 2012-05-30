@@ -39,6 +39,9 @@ public final class R {
     public static final class string {
         public static final int Image=0x7f060001;
         public static final int OkButton=0x7f060003;
+        public static final int TagPage=0x7f060004;
+        public static final int TagSetFlags=0x7f060005;
+        public static final int TagUnSetFlags=0x7f060006;
         public static final int app_name=0x7f060000;
         public static final int timerSecret=0x7f060002;
     }
