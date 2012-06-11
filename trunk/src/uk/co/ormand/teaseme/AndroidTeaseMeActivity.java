@@ -3,7 +3,10 @@ package uk.co.ormand.teaseme;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+//import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Timer;
@@ -19,6 +22,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import android.R.color;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
@@ -43,6 +47,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
+import android.view.ViewGroup.LayoutParams;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebView;
@@ -71,11 +76,6 @@ public class AndroidTeaseMeActivity extends Activity {
 	private Boolean blnDebug;
 	private int intHeightTop;
 	private int intWidthTop;
-	private int intWidthImage;
-	private int intTextViewHeight;
-	private int intRightHeight;
-	private int intRightWidth;
-	private int intBtnHeight;
 	private LinearLayout objLayoutImage;
 	private SoundPool soundPool;
 	private int sound;
@@ -91,7 +91,11 @@ public class AndroidTeaseMeActivity extends Activity {
 	private String strSounds[];
 	private int intSounds[];
 	private int intSoundCount;
+	private static final String TAG = "ATM";
 
+	//TODO audio loop
+	//TODO about
+	//TODO vote
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
@@ -99,8 +103,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		try {
 			setVolumeControlStream(AudioManager.STREAM_MUSIC);
 			requestWindowFeature(Window.FEATURE_NO_TITLE);
-			getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-					WindowManager.LayoutParams.FLAG_FULLSCREEN);
+			getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
 			setContentView(R.layout.main);
 
@@ -109,48 +112,29 @@ public class AndroidTeaseMeActivity extends Activity {
 			DisplayMetrics dm = new DisplayMetrics();
 			getWindowManager().getDefaultDisplay().getMetrics(dm);
 
-			// objLayoutTop = (LinearLayout) findViewById(R.id.LayoutTop);
 			intHeightTop = dm.heightPixels;
 			intWidthTop = dm.widthPixels;
 
 			objLayoutImage = (LinearLayout) findViewById(R.id.LayoutImage);
-			ViewGroup.LayoutParams objLayoutParm = objLayoutImage
-					.getLayoutParams();
-			intWidthImage = intWidthTop / 2;
-			objLayoutParm.width = intWidthImage;
-			objLayoutImage.setLayoutParams(objLayoutParm);
 
-			LinearLayout objLayoutRight = (LinearLayout) findViewById(R.id.LayoutRight);
-			objLayoutParm = objLayoutRight.getLayoutParams();
-			intRightWidth = intWidthTop - intWidthImage;
-			objLayoutParm.width = intRightWidth;
-			objLayoutRight.setLayoutParams(objLayoutParm);
-
-			SharedPreferences sharedPrefs = PreferenceManager
-					.getDefaultSharedPreferences(this);
+			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
-			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize",
-					"10"));
-
-			LinearLayout objLayoutTextTop = (LinearLayout) findViewById(R.id.LayoutTextTop);
-			objLayoutParm = objLayoutTextTop.getLayoutParams();
-			intTextViewHeight = intHeightTop / 20;
-			objLayoutParm.height = intTextViewHeight;
-			objLayoutTextTop.setLayoutParams(objLayoutParm);
-			intRightHeight = intHeightTop - intTextViewHeight;
-			float fltH = intRightHeight / 10;
-			fltH = fltH * MintFontSize;
-			fltH = fltH / 8;
-			intBtnHeight = (int) fltH;
-
-			// strBaseTitle = (String) getTitle();
-			objWebView1 = (WebView) findViewById(R.id.webView1);
-			objCountText = (TextView) findViewById(R.id.textView1);
+			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
 			objSDRoot = Environment.getExternalStorageDirectory();
-			strPresentationPath = objSDRoot.getAbsolutePath()
-					+ "/Android/data/uk.co.ormand.teaseme/files/";
-			objPresFolder = new File(strPresentationPath);
+			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
+			if (strPresentationPath == "") {
+				SharedPreferences.Editor objPrefEdit = sharedPrefs.edit();
+				objPrefEdit.putString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
+				objPrefEdit.commit();
+				strPresentationPath = objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/";
+			}
 
+			objWebView1 = (WebView) findViewById(R.id.webView1);
+			
+			objCountText = (TextView) findViewById(R.id.textViewTimer);
+
+			objPresFolder = new File(strPresentationPath);
+			
 			// write .nomedia
 			@SuppressWarnings("unused")
 			boolean blnTry;
@@ -169,10 +153,25 @@ public class AndroidTeaseMeActivity extends Activity {
 
 			Flags = new ArrayList<String>();
 		} catch (NumberFormatException e) {
-			Log.e("onCreate",
-					"NumberFormatException " + e.getLocalizedMessage());
+			Log.e(TAG, "OnCreate NumberFormatException ", e);
 		} catch (Exception e) {
-			Log.e("onCreate", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "OnCreate Exception ", e);
+		}
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		try {
+			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+			blnDebug = sharedPrefs.getBoolean("Debug", false);
+			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
+			objSDRoot = Environment.getExternalStorageDirectory();
+			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
+		} catch (NumberFormatException e) {
+			Log.e(TAG, "onResume Exception ", e);
+		} catch (Exception e) {
+			Log.e(TAG, "onResume Exception ", e);
 		}
 	}
 
@@ -193,7 +192,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					strTag = (String) button.getTag(R.string.TagPage);
 					displayPage(strTag);
 				} catch (Exception e) {
-					Log.e("onClick", "Exception " + e.getLocalizedMessage());
+					Log.e(TAG, "OnClick Exception ", e);
 				}
 			}
 		};
@@ -224,7 +223,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				return true;
 			}
 		} catch (Exception e) {
-			Log.e("onClick", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "onClick Exception ", e);
 		}
 		return false;
 
@@ -251,7 +250,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		int intMin;
 		int intMax;
 		int intDpLeft;
-		int intRows;
+		//*int intRows;
 		String strMin;
 		String strMax;
 		String strPre;
@@ -350,8 +349,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					elImage = (Element) tmpNodeList.item(0);
 					if (elImage != null) {
 						strImage = elImage.getAttribute("id");
-						imgPath = strPresentationPath + strMediaDirectory + "/"
-								+ strImage;
+						imgPath = strPresentationPath + strMediaDirectory + "/" + strImage;
 						objVideoView = new VideoView(this);
 						objLayoutImage.removeAllViews();
 						objLayoutImage.addView(objVideoView);
@@ -368,8 +366,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						int intSubDir = strImage.lastIndexOf("/");
 						String strSubDir;
 						if (intSubDir > -1) {
-							strSubDir = "/"
-									+ strImage.substring(0, intSubDir + 1);
+							strSubDir = "/" + strImage.substring(0, intSubDir + 1);
 							strImage = strImage.substring(intSubDir + 1);
 						} else {
 							strSubDir = "";
@@ -379,24 +376,19 @@ public class AndroidTeaseMeActivity extends Activity {
 						if (strImage.indexOf("*") > -1) {
 							strFilePatern = strImage;
 							// get the directory
-							File f = new File(strPresentationPath
-									+ strMediaDirectory + strSubDir);
+							File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
 							// wildcard filter class handles the filtering
 							java.io.FileFilter WildCardfilter = new WildCardFileFilter();
 							if (f.isDirectory()) {
 								// return a list of matching files
 								File[] children = f.listFiles(WildCardfilter);
 								// return a random image
-								int intFile = rndGen
-										.nextInt(children.length);
-								imgPath = strPresentationPath
-										+ strMediaDirectory + strSubDir + "/"
-										+ children[intFile].getName();
+								int intFile = rndGen.nextInt(children.length);
+								imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + children[intFile].getName();
 							}
 						} else {
 							// no wildcard so just use the file name
-							imgPath = strPresentationPath + strMediaDirectory
-									+ strSubDir + "/" + strImage;
+							imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + strImage;
 						}
 						// we create a new image view every time (we may have
 						// displayed a video last time)
@@ -405,29 +397,27 @@ public class AndroidTeaseMeActivity extends Activity {
 						// before it gets to memory
 						// we can load large images using memory efficiently
 						// (and not run out of memory and crash the app)
-						objImageView
-								.setImageBitmap(decodeSampledBitmapFromFile(
-										imgPath, intWidthImage, intHeightTop));
+						
+						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2,intHeightTop));
 						// Clear the parent layout
 						objLayoutImage.removeAllViews();
 						// add the new image to it and set it to fill the
 						// available area
 						objLayoutImage.addView(objImageView);
 						layout = objImageView.getLayoutParams();
-						layout.width = ViewGroup.LayoutParams.FILL_PARENT;
+						layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
 						layout.height = ViewGroup.LayoutParams.FILL_PARENT;
-						objImageView
-								.setScaleType(ImageView.ScaleType.FIT_CENTER);
+						objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+						objImageView.setLayoutParams(layout);
 					}
 
 					// text
 					tmpNodeList = elPage.getElementsByTagName("Text");
 					elText = tmpNodeList.item(0);
-					strHTML = "<html><head><title/></head><body style=\"background-color:black; color:white; font-family: Tahoma; font-size:"
-							+ MintFontSize
-							+ "pt\">"
-							+ getInnerXml(elText, true) + "</body></html>";
+					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:10 } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
 					objWebView1.loadData(strHTML, "text/html", null);
+					objWebView1.setBackgroundColor(color.black);
+					
 
 					// delay
 					//
@@ -468,18 +458,14 @@ public class AndroidTeaseMeActivity extends Activity {
 							if (intPos1 > -1) {
 								intPos2 = strDelSeconds.indexOf("..", intPos1);
 								if (intPos2 > -1) {
-									intPos3 = strDelSeconds.indexOf(")",
-											intPos2);
+									intPos3 = strDelSeconds.indexOf(")", intPos2);
 									if (intPos3 > -1) {
-										strMin = strDelSeconds.substring(
-												intPos1 + 1, intPos2);
+										strMin = strDelSeconds.substring(intPos1 + 1, intPos2);
 										intMin = Integer.parseInt(strMin);
-										strMax = strDelSeconds.substring(
-												intPos2 + 2, intPos3);
+										strMax = strDelSeconds.substring(intPos2 + 2, intPos3);
 										intMax = Integer.parseInt(strMax);
 										Random r = new Random();
-										int i1 = r.nextInt(intMax - intMin)
-												+ intMin;
+										int i1 = r.nextInt(intMax - intMin) + intMin;
 										intDelSeconds = i1;
 									}
 								}
@@ -501,8 +487,7 @@ public class AndroidTeaseMeActivity extends Activity {
 
 					// add new buttons
 					tmpNodeList = elPage.getElementsByTagName("Button");
-					intDpLeft = intRightWidth;
-					intRows = 1;
+					intDpLeft = 43;
 					btnLayoutRow = new LinearLayout(this);
 					btnLayout.addView(btnLayoutRow);
 					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
@@ -539,47 +524,40 @@ public class AndroidTeaseMeActivity extends Activity {
 								Button btnDynamic = new Button(this);
 								btnDynamic.setText(strBtnText);
 								btnDynamic.setTextSize(MintFontSize);
-								int intBtnWidth = intBtnHeight
-										+ (int) (intBtnHeight / 7)
-										* strBtnText.length();
-								if (intBtnWidth > intDpLeft) {
-									intDpLeft = intRightWidth - intBtnWidth;
-									intRows++;
+								
+								if (intDpLeft < strBtnText.length() ) {
+									intDpLeft = 43;
 									btnLayoutRow = new LinearLayout(this);
 									btnLayout.addView(btnLayoutRow);
 									layout = btnLayout.getLayoutParams();
-									layout.height = intBtnHeight;
+									layout.height = LayoutParams.WRAP_CONTENT;
+									layout.width = LayoutParams.WRAP_CONTENT;
 									btnLayout.setLayoutParams(layout);
 								} else {
-									intDpLeft = intDpLeft - intBtnWidth;
+									intDpLeft = intDpLeft - strBtnText.length();
 								}
 
 								// record any button set / unset
-								String strButtonSet;
+								// String strButtonSet;
 								strSet = elButton.getAttribute("set");
 								if (!strSet.equals("")) {
-									btnDynamic.setTag(R.string.TagSetFlags,
-											strSet);
+									btnDynamic.setTag(R.string.TagSetFlags, strSet);
 								} else {
 									btnDynamic.setTag(R.string.TagSetFlags, "");
 								}
 								strSet = elButton.getAttribute("unset");
 								if (!strSet.equals("")) {
-									btnDynamic.setTag(R.string.TagUnSetFlags,
-											strSet);
+									btnDynamic.setTag(R.string.TagUnSetFlags, strSet);
 								} else {
-									btnDynamic.setTag(R.string.TagUnSetFlags,
-											"");
+									btnDynamic.setTag(R.string.TagUnSetFlags, "");
 								}
 
-								btnDynamic.setTag(R.string.TagPage,
-										strBtnTarget);
-								btnDynamic
-										.setOnClickListener(getOnClickDoSomething(btnDynamic));
+								btnDynamic.setTag(R.string.TagPage, strBtnTarget);
+								btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
 								btnLayoutRow.addView(btnDynamic);
 								layout = btnDynamic.getLayoutParams();
-								layout.width = intBtnWidth;
-								layout.height = intBtnHeight;
+								layout.width = LayoutParams.WRAP_CONTENT;
+								layout.height = LayoutParams.WRAP_CONTENT;
 								btnDynamic.setLayoutParams(layout);
 							}
 						}
@@ -590,39 +568,35 @@ public class AndroidTeaseMeActivity extends Activity {
 							Button btnDynamic = new Button(this);
 							btnDynamic.setText("Delay");
 							btnDynamic.setTextSize(MintFontSize);
-							int intBtnWidth = intBtnHeight
-									+ (int) (intBtnHeight / 7) * 5;
-							if (intBtnWidth > intDpLeft) {
-								intDpLeft = intRightWidth - intBtnWidth;
-								intRows++;
+
+							if (intDpLeft < 5 ) {
+								intDpLeft = 43;
 								btnLayoutRow = new LinearLayout(this);
 								btnLayout.addView(btnLayoutRow);
 								layout = btnLayout.getLayoutParams();
-								layout.height = intBtnHeight;
+								layout.height = LayoutParams.WRAP_CONTENT;
+								layout.width = LayoutParams.WRAP_CONTENT;
 								btnLayout.setLayoutParams(layout);
 							} else {
-								intDpLeft = intDpLeft - intBtnWidth;
+								intDpLeft = intDpLeft - 5;
 							}
-							btnDynamic.setTag(strDelTarget);
-							btnDynamic
-									.setOnClickListener(getOnClickDoSomething(btnDynamic));
+
+							btnDynamic.setTag(R.string.TagSetFlags, strDelaySet);
+							btnDynamic.setTag(R.string.TagUnSetFlags, strDelayUnSet);
+							btnDynamic.setTag(R.string.TagPage, strDelTarget);
+							btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
 							btnLayoutRow.addView(btnDynamic);
 							layout = btnDynamic.getLayoutParams();
-							layout.width = intBtnWidth;
-							layout.height = intBtnHeight;
+							layout.width = LayoutParams.WRAP_CONTENT;
+							layout.height = LayoutParams.WRAP_CONTENT;
 							btnDynamic.setLayoutParams(layout);
 						}
 						TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
 						objDebugText.setText(" " + strPageName);
+					} else {
+						TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
+						objDebugText.setText("");
 					}
-					layout = btnLayout.getLayoutParams();
-					layout.height = intBtnHeight * intRows;
-					btnLayout.setLayoutParams(layout);
-					layout = objWebView1.getLayoutParams();
-					int intWebViewHeight = intRightHeight
-							- (intBtnHeight * intRows);
-					layout.height = intWebViewHeight;
-					objWebView1.setLayoutParams(layout);
 
 					// Audio / Metronome
 					tmpNodeList = elPage.getElementsByTagName("Metronome");
@@ -634,18 +608,13 @@ public class AndroidTeaseMeActivity extends Activity {
 						intbpm = 60000 / intbpm;
 						try {
 							tmrTetronome = new Timer();
-							tmrTetronome.schedule(new MetronomeTask(), intbpm,
-									intbpm);
+							tmrTetronome.schedule(new MetronomeTask(), intbpm, intbpm);
 						} catch (IllegalArgumentException e) {
-							Log.e("displayPage", "IllegalArgumentException "
-									+ e.getLocalizedMessage());
+							Log.e(TAG, "displayPage IllegalArgumentException ", e);
 						} catch (IllegalStateException e) {
-							Log.e("displayPage",
-									"IllegalStateException "
-											+ e.getLocalizedMessage());
+							Log.e(TAG, "displayPage IllegalStateException ", e);
 						} catch (Exception e) {
-							Log.e("displayPage",
-									"Exception " + e.getLocalizedMessage());
+							Log.e(TAG, "displayPage Exception ", e);
 						}
 					} else {
 						// Audio
@@ -657,9 +626,7 @@ public class AndroidTeaseMeActivity extends Activity {
 							String strAudio = elAudio.getAttribute("id");
 							for (i = 0; i < intSoundCount; i++) {
 								if (strSounds[i].equals(strAudio)) {
-									intSoundStream = soundPool.play(
-											intSounds[i], 1.0f, 1.0f, 0, 0,
-											1.0f);
+									intSoundStream = soundPool.play(intSounds[i], 1.0f, 1.0f, 0, 0, 1.0f);
 								}
 							}
 						}
@@ -669,7 +636,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				}
 			}
 		} catch (Exception e) {
-			Log.e("displayPage", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "displayPage Exception ", e);
 		}
 	}
 
@@ -691,11 +658,14 @@ public class AndroidTeaseMeActivity extends Activity {
 			objDocPresXML.getDocumentElement().normalize();
 
 			// AutoSetPageWhenSeen
-			objNodeList = objDocPresXML
-					.getElementsByTagName("AutoSetPageWhenSeen");
+			objNodeList = objDocPresXML.getElementsByTagName("AutoSetPageWhenSeen");
 			objAutoset = (Element) objNodeList.item(0);
-			blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild()
-					.getNodeValue());
+
+			if (objAutoset == null) {
+				blnAutoSetPage = false;
+			} else {
+				blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild().getNodeValue());
+			}
 
 			// Media directory
 			objNodeList = objDocPresXML.getElementsByTagName("MediaDirectory");
@@ -726,26 +696,24 @@ public class AndroidTeaseMeActivity extends Activity {
 				}
 				if (!blnLoaded) {
 					strSounds[intSoundCount] = strAudio;
-					intSounds[intSoundCount] = soundPool.load(
-							strPresentationPath + strMediaDirectory + "/"
-									+ strAudio, 1);
+					intSounds[intSoundCount] = soundPool.load(strPresentationPath + strMediaDirectory + "/" + strAudio, 1);
 					intSoundCount++;
 				}
 			}
 		} catch (ParserConfigurationException e) {
-			Log.e("loadXML",
-					"ParserConfigurationException " + e.getLocalizedMessage());
+			Log.e(TAG, "loadXML ParserConfigurationException ", e);
 		} catch (SAXException e) {
-			Log.e("loadXML", "SAXException " + e.getLocalizedMessage());
+			Log.e(TAG, "loadXML SAXException ", e);
 		} catch (IOException e) {
-			Log.e("loadXML", "IOException " + e.getLocalizedMessage());
+			Log.e(TAG, "loadXML IOException ", e);
 		} catch (Exception e) {
-			Log.e("loadXML", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "loadXML Exception ", e);
 		}
 	}
 
 	private String getInnerXml(Node objXMLNode, boolean blnTopNode) {
 		String strXML;
+		String strTemp;
 		Node objTmpElement;
 		NodeList tmpNodeList;
 		strXML = "";
@@ -764,10 +732,12 @@ public class AndroidTeaseMeActivity extends Activity {
 				}
 			}
 			if (objXMLNode.getNodeType() == Node.TEXT_NODE) {
-				strXML = strXML + objXMLNode.getNodeValue();
+				strTemp = objXMLNode.getNodeValue();
+				strTemp = strTemp.replace("%", "&#37;");
+				strXML = strXML + strTemp;
 			}
 		} catch (Exception e) {
-			Log.e("getInnerXml", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "getInnerXml Exception ", e);
 		}
 		return strXML;
 	}
@@ -783,15 +753,19 @@ public class AndroidTeaseMeActivity extends Activity {
 		// display the target page
 		@Override
 		public void onFinish() {
-			objCountText.setText("");
-			// do set / unset
-			if (!strDelaySet.equals("")) {
-				SetFlags(strDelaySet);
+			try {
+				objCountText.setText("");
+				// do set / unset
+				if (!strDelaySet.equals("")) {
+					SetFlags(strDelaySet);
+				}
+				if (!strDelayUnSet.equals("")) {
+					UnsetFlags(strDelayUnSet);
+				}
+				displayPage(strDelTarget);
+			} catch (Exception e) {
+				Log.e(TAG, "onFinish Exception ", e);
 			}
-			if (!strDelayUnSet.equals("")) {
-				UnsetFlags(strDelayUnSet);
-			}
-			displayPage(strDelTarget);
 		}
 
 		// update the clock
@@ -818,8 +792,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					objCountText.setText("");
 				}
 			} catch (Exception e) {
-				Log.e("PageTimer.onTick",
-						"Exception " + e.getLocalizedMessage());
+				Log.e(TAG, "PageTimer.onTick Exception ", e);
 			}
 		}
 	}
@@ -840,8 +813,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			try {
 				intSoundStream = soundPool.play(sound, 1.0f, 1.0f, 0, 0, 1.0f);
 			} catch (Exception e) {
-				Log.e("MetronomeTask.run",
-						"Exception " + e.getLocalizedMessage());
+				Log.e(TAG, "MetronomeTask.run Exception ", e);
 			}
 		}
 	}
@@ -864,11 +836,12 @@ public class AndroidTeaseMeActivity extends Activity {
 					}
 				};
 				mFileList = objPresFolder.list(filter);
+				Arrays.sort(mFileList);
 			} else {
 				mFileList = new String[0];
 			}
 		} catch (Exception e) {
-			Log.e("loadFileList", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "loadFileList Exception ", e);
 		}
 	}
 
@@ -887,15 +860,13 @@ public class AndroidTeaseMeActivity extends Activity {
 					dialog = builder.create();
 					return dialog;
 				}
-				builder.setItems(mFileList,
-						new DialogInterface.OnClickListener() {
-							public void onClick(DialogInterface dialog,
-									int which) {
-								mChosenFile = mFileList[which];
-								loadXML(mChosenFile);
-								displayPage("start");
-							}
-						});
+				builder.setItems(mFileList, new DialogInterface.OnClickListener() {
+					public void onClick(DialogInterface dialog, int which) {
+						mChosenFile = mFileList[which];
+						loadXML(mChosenFile);
+						displayPage("start");
+					}
+				});
 				dialog = builder.show();
 				break;
 			case DIALOG_PASSWORD_ENTER:
@@ -903,12 +874,10 @@ public class AndroidTeaseMeActivity extends Activity {
 				dialog.setCancelable(false);
 				dialog.setContentView(R.layout.passwordentry);
 				dialog.setTitle("Enter Password");
-				Button objButtonPwd = (Button) dialog
-						.findViewById(R.id.btnPasswordOk);
+				Button objButtonPwd = (Button) dialog.findViewById(R.id.btnPasswordOk);
 				objButtonPwd.setOnClickListener(new OnClickListener() {
 					public void onClick(View v) {
-						EditText edit = (EditText) dialog
-								.findViewById(R.id.editTextPassword);
+						EditText edit = (EditText) dialog.findViewById(R.id.editTextPassword);
 						String text = edit.getText().toString();
 						dialog.dismiss();
 						strPasswordEntered = text;
@@ -920,7 +889,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				break;
 			}
 		} catch (Exception e) {
-			Log.e("onCreateDialog", "Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "onCreateDialog Exception ", e);
 		}
 		return dialog;
 	}
@@ -947,57 +916,58 @@ public class AndroidTeaseMeActivity extends Activity {
 
 				return true;
 			} catch (Exception e) {
-				Log.e("WildCardFileFilter.accept",
-						"Exception " + e.getLocalizedMessage());
+				Log.e(TAG, "WildCardFileFilter.accept Exception ", e);
 				return false;
 			}
 		}
 	}
 
-	// calculate resize factor to fit images to the available screen size
-	public static int calculateInSampleSize(BitmapFactory.Options options,
-			int reqWidth, int reqHeight) {
-		int inSampleSize = 1;
-		try {
-			// Raw height and width of image
-			final int height = options.outHeight;
-			final int width = options.outWidth;
-
-			if (height > reqHeight || width > reqWidth) {
-				if (width > height) {
-					inSampleSize = Math.round((float) height
-							/ (float) reqHeight);
-				} else {
-					inSampleSize = Math.round((float) width / (float) reqWidth);
-				}
-			}
-		} catch (Exception e) {
-			Log.e("calculateInSampleSize",
-					"Exception " + e.getLocalizedMessage());
-		}
-		return inSampleSize;
-	}
-
 	// return the image resized to the correct size to display
-	public static Bitmap decodeSampledBitmapFromFile(String strFile,
-			int reqWidth, int reqHeight) {
+	public static Bitmap decodeSampledBitmapFromFile(String strFile, int reqWidth, int reqHeight) {
 		try {
 
 			// First decode with inJustDecodeBounds=true to check dimensions
 			final BitmapFactory.Options options = new BitmapFactory.Options();
+			Bitmap objBitMap;
 			options.inJustDecodeBounds = true;
 			BitmapFactory.decodeFile(strFile, options);
+			float fltRatio;
 
-			// Calculate inSampleSize
-			options.inSampleSize = calculateInSampleSize(options, reqWidth,
-					reqHeight);
+			int inSampleSize = 1;
+			try {
+				// Raw height and width of image
+				final int height = options.outHeight;
+				final int width = options.outWidth;
+				
+				if (width > reqWidth) {
+					inSampleSize = Math.round((float) width / (float) reqWidth);
+				} else if (height > reqHeight) {
+					inSampleSize = Math.round((float) height / (float) reqHeight);
+				}
 
-			// Decode bitmap with inSampleSize set
-			options.inJustDecodeBounds = false;
-			return BitmapFactory.decodeFile(strFile, options);
+				// Calculate inSampleSize
+				options.inSampleSize = inSampleSize;
+
+				// Decode bitmap with inSampleSize set
+				options.inJustDecodeBounds = false;
+				
+				objBitMap = BitmapFactory.decodeFile(strFile, options);
+				fltRatio =  (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
+				if (fltRatio > 1) {
+					//portrait
+					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
+				} else {
+					//landscape
+					objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), false);
+				}
+			} catch (Exception e) {
+				Log.e(TAG, "calculateInSampleSize Exception ", e);
+				return null;
+			}
+			
+			return objBitMap;
 		} catch (Exception e) {
-			Log.e("calculateInSampleSize",
-					"Exception " + e.getLocalizedMessage());
+			Log.e(TAG, "decodeSampledBitmapFromFile Exception ", e);
 			return null;
 		}
 	}
@@ -1005,21 +975,29 @@ public class AndroidTeaseMeActivity extends Activity {
 	// functions to handle set flags go here
 	private void SetFlags(String flagNames) {
 		String[] flags;
-		flags = flagNames.split(",", -1);
-		for (int i = 0; i < flags.length; i++) {
-			if (!Flags.contains(flags[i])) {
-				Flags.add(flags[i]);
+		try {
+			flags = flagNames.split(",", -1);
+			for (int i = 0; i < flags.length; i++) {
+				if (!Flags.contains(flags[i])) {
+					Flags.add(flags[i]);
+				}
 			}
+		} catch (Exception e) {
+			Log.e(TAG, "SetFlags Exception ", e);
 		}
 	}
 
 	private void UnsetFlags(String flagNames) {
 		String[] flags;
-		flags = flagNames.split(",", -1);
-		for (int i = 0; i < flags.length; i++) {
-			if (Flags.contains(flags[i]) && !flags[i].equals("")) {
-				Flags.remove(flags[i]);
+		try {
+			flags = flagNames.split(",", -1);
+			for (int i = 0; i < flags.length; i++) {
+				if (Flags.contains(flags[i]) && !flags[i].equals("")) {
+					Flags.remove(flags[i]);
+				}
 			}
+		} catch (Exception e) {
+			Log.e(TAG, "UnsetFlags Exception ", e);
 		}
 	}
 
@@ -1029,33 +1007,37 @@ public class AndroidTeaseMeActivity extends Activity {
 		boolean blnOr = false;
 		String[] conditions;
 
-		if (condition.indexOf("|") > -1) {
-			blnOr = true;
-			condition = condition.replace("|", ",");
-			conditions = condition.split(",", -1);
-			for (int i = 0; i < conditions.length; i++) {
-				if (Flags.contains(conditions[i])) {
-					blnReturn = true;
-					break;
+		try {
+			if (condition.indexOf("|") > -1) {
+				blnOr = true;
+				condition = condition.replace("|", ",");
+				conditions = condition.split(",", -1);
+				for (int i = 0; i < conditions.length; i++) {
+					if (Flags.contains(conditions[i])) {
+						blnReturn = true;
+						break;
+					}
 				}
 			}
-		}
 
-		if (condition.indexOf("+") > -1) {
-			blnAnd = true;
-			blnReturn = true;
-			condition = condition.replace("+", ",");
-			conditions = condition.split(",", -1);
-			for (int i = 0; i < conditions.length; i++) {
-				if (!Flags.contains(conditions[i])) {
-					blnReturn = false;
-					break;
+			if (condition.indexOf("+") > -1) {
+				blnAnd = true;
+				blnReturn = true;
+				condition = condition.replace("+", ",");
+				conditions = condition.split(",", -1);
+				for (int i = 0; i < conditions.length; i++) {
+					if (!Flags.contains(conditions[i])) {
+						blnReturn = false;
+						break;
+					}
 				}
 			}
-		}
 
-		if (!blnAnd && !blnOr) {
-			blnReturn = Flags.contains(condition);
+			if (!blnAnd && !blnOr) {
+				blnReturn = Flags.contains(condition);
+			}
+		} catch (Exception e) {
+			Log.e(TAG, "MatchesIfSetCondition Exception ", e);
 		}
 
 		return blnReturn;
@@ -1067,33 +1049,37 @@ public class AndroidTeaseMeActivity extends Activity {
 		boolean blnOr = false;
 		String[] conditions;
 
-		if (condition.indexOf("+") > -1) {
-			blnAnd = true;
-			blnReturn = true;
-			condition = condition.replace("+", ",");
-			conditions = condition.split(",", -1);
-			for (int i = 0; i < conditions.length; i++) {
-				if (Flags.contains(conditions[i])) {
-					blnReturn = false;
-					break;
+		try {
+			if (condition.indexOf("+") > -1) {
+				blnAnd = true;
+				blnReturn = true;
+				condition = condition.replace("+", ",");
+				conditions = condition.split(",", -1);
+				for (int i = 0; i < conditions.length; i++) {
+					if (Flags.contains(conditions[i])) {
+						blnReturn = false;
+						break;
+					}
 				}
 			}
-		}
 
-		if (condition.indexOf("|") > -1) {
-			blnOr = true;
-			condition = condition.replace("|", ",");
-			conditions = condition.split(",", -1);
-			for (int i = 0; i < conditions.length; i++) {
-				if (!Flags.contains(conditions[i])) {
-					blnReturn = true;
-					break;
+			if (condition.indexOf("|") > -1) {
+				blnOr = true;
+				condition = condition.replace("|", ",");
+				conditions = condition.split(",", -1);
+				for (int i = 0; i < conditions.length; i++) {
+					if (!Flags.contains(conditions[i])) {
+						blnReturn = true;
+						break;
+					}
 				}
 			}
-		}
 
-		if (!blnAnd && !blnOr) {
-			blnReturn = !Flags.contains(condition);
+			if (!blnAnd && !blnOr) {
+				blnReturn = !Flags.contains(condition);
+			}
+		} catch (Exception e) {
+			Log.e(TAG, "MatchesIfNotSetCondition Exception ", e);
 		}
 
 		return blnReturn;
@@ -1106,27 +1092,31 @@ public class AndroidTeaseMeActivity extends Activity {
 		boolean blnCanShow = false;
 		boolean blnSet = true;
 		boolean blnNotSet = true;
-		// loop through till we find the page
-		for (int i = 0; i < pageNodeList.getLength(); i++) {
-			elPage = (Element) pageNodeList.item(i);
-			String strId = elPage.getAttribute("id");
-			if (strId.equals(pageId)) {
-				// found the page so check it
-				strTest = elPage.getAttribute("if-set");
-				if (!strTest.equals("")) {
-					blnSet = MatchesIfSetCondition(strTest);
+		try {
+			// loop through till we find the page
+			for (int i = 0; i < pageNodeList.getLength(); i++) {
+				elPage = (Element) pageNodeList.item(i);
+				String strId = elPage.getAttribute("id");
+				if (strId.equals(pageId)) {
+					// found the page so check it
+					strTest = elPage.getAttribute("if-set");
+					if (!strTest.equals("")) {
+						blnSet = MatchesIfSetCondition(strTest);
+					}
+					strTest = elPage.getAttribute("if-not-set");
+					if (!strTest.equals("")) {
+						blnNotSet = MatchesIfNotSetCondition(strTest);
+					}
+					if (blnSet && blnNotSet) {
+						blnCanShow = MatchesIfNotSetCondition(pageId);
+					} else {
+						blnCanShow = false;
+					}
+					break;
 				}
-				strTest = elPage.getAttribute("if-not-set");
-				if (!strTest.equals("")) {
-					blnNotSet = MatchesIfNotSetCondition(strTest);
-				}
-				if (blnSet && blnNotSet) {
-					blnCanShow = MatchesIfNotSetCondition(pageId);
-				} else {
-					blnCanShow = false;
-				}
-				break;
 			}
+		} catch (Exception e) {
+			Log.e(TAG, "AllowedToShowPage Exception ", e);
 		}
 		return blnCanShow;
 	}
