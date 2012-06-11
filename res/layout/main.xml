@@ -2,51 +2,68 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/LayoutTop"
     android:layout_width="fill_parent"
-    android:layout_height="fill_parent" >
+    android:layout_height="fill_parent"
+    android:keepScreenOn="true"
+    android:baselineAligned="false" >
 
     <LinearLayout
         android:id="@+id/LayoutImage"
         android:layout_width="wrap_content"
-        android:layout_height="fill_parent" >
+        android:layout_height="fill_parent">
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/LayoutRight"
         android:layout_width="wrap_content"
         android:layout_height="fill_parent"
-        android:orientation="vertical" >
+        android:orientation="vertical"
+        android:layout_weight="1">
 
         <LinearLayout
             android:id="@+id/LayoutTextTop"
             android:layout_width="fill_parent"
-            android:layout_height="fill_parent" >
+            android:layout_height="wrap_content"
+            android:gravity="fill_horizontal">
 
             <TextView
-                android:id="@+id/textView1"
+                android:id="@+id/textViewTimer"
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
                 android:text="@string/timerSecret"
-                android:textSize="12sp" />
+                android:layout_gravity="left"
+                android:textSize="12sp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/textViewDebug"
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
                 android:text=""
-                android:textSize="12sp" />
+                android:layout_gravity="center"
+                android:textSize="12sp"
+                android:layout_weight="1" />
+
+            <DigitalClock
+                android:id="@+id/digitalClock1"
+                android:layout_width="wrap_content"
+                android:layout_height="fill_parent"
+                android:layout_gravity="right"
+                android:gravity="right"
+                android:textSize="12sp"
+                android:layout_weight="1" />
         </LinearLayout>
 
         <WebView
             android:id="@+id/webView1"
             android:layout_width="fill_parent"
-            android:layout_height="wrap_content" />
-
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
         <LinearLayout
             android:id="@+id/btnLayout"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" >
-
         </LinearLayout>
     </LinearLayout>
 
