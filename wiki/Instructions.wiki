@@ -9,3 +9,5 @@ Android/data/uk.co.ormand.teaseme/files
 
 when you run the program for the first time it should create the directory
 it will also create an empty file called .nomedia which will tell Android not to index the directory (you will not see pictures in the gallery etc.)
+
+(the data directory can now be changed in the preferences)
