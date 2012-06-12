@@ -121,15 +121,16 @@ public class AndroidTeaseMeActivity extends Activity {
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
 			objSDRoot = Environment.getExternalStorageDirectory();
-			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
+			strPresentationPath = sharedPrefs.getString("PrefDir", "");
 			if (strPresentationPath == "") {
 				SharedPreferences.Editor objPrefEdit = sharedPrefs.edit();
 				objPrefEdit.putString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
 				objPrefEdit.commit();
-				strPresentationPath = objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/";
+				strPresentationPath = sharedPrefs.getString("PrefDir", "");
 			}
 
 			objWebView1 = (WebView) findViewById(R.id.webView1);
+			objWebView1.setBackgroundColor(0);
 			
 			objCountText = (TextView) findViewById(R.id.textViewTimer);
 
@@ -487,7 +488,7 @@ public class AndroidTeaseMeActivity extends Activity {
 
 					// add new buttons
 					tmpNodeList = elPage.getElementsByTagName("Button");
-					intDpLeft = 43;
+					intDpLeft = 35;
 					btnLayoutRow = new LinearLayout(this);
 					btnLayout.addView(btnLayoutRow);
 					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
@@ -526,16 +527,15 @@ public class AndroidTeaseMeActivity extends Activity {
 								btnDynamic.setTextSize(MintFontSize);
 								
 								if (intDpLeft < strBtnText.length() ) {
-									intDpLeft = 43;
+									intDpLeft = 35;
 									btnLayoutRow = new LinearLayout(this);
 									btnLayout.addView(btnLayoutRow);
 									layout = btnLayout.getLayoutParams();
 									layout.height = LayoutParams.WRAP_CONTENT;
 									layout.width = LayoutParams.WRAP_CONTENT;
 									btnLayout.setLayoutParams(layout);
-								} else {
-									intDpLeft = intDpLeft - strBtnText.length();
 								}
+								intDpLeft = intDpLeft - (strBtnText.length() + 3);
 
 								// record any button set / unset
 								// String strButtonSet;
@@ -570,7 +570,7 @@ public class AndroidTeaseMeActivity extends Activity {
 							btnDynamic.setTextSize(MintFontSize);
 
 							if (intDpLeft < 5 ) {
-								intDpLeft = 43;
+								intDpLeft = 35;
 								btnLayoutRow = new LinearLayout(this);
 								btnLayout.addView(btnLayoutRow);
 								layout = btnLayout.getLayoutParams();
@@ -578,7 +578,7 @@ public class AndroidTeaseMeActivity extends Activity {
 								layout.width = LayoutParams.WRAP_CONTENT;
 								btnLayout.setLayoutParams(layout);
 							} else {
-								intDpLeft = intDpLeft - 5;
+								intDpLeft = intDpLeft - 8;
 							}
 
 							btnDynamic.setTag(R.string.TagSetFlags, strDelaySet);
