@@ -35,7 +35,9 @@ public final class R {
         public static final int show_settings_layout=0x7f030003;
     }
     public static final class raw {
-        public static final int tick=0x7f050000;
+        public static final int android=0x7f050000;
+        public static final int atm=0x7f050001;
+        public static final int tick=0x7f050002;
     }
     public static final class string {
         public static final int Image=0x7f060001;
