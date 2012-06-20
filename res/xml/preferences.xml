@@ -21,4 +21,9 @@
         android:summary="Data Directory"
         android:title="Data Directory" />
         />
+    <EditTextPreference
+        android:defaultValue="35"
+        android:key="BtnLetters"
+        android:summary="Number of letters for dynamic buttons per row"
+        android:title="Button Letters per Row" />
 </PreferenceScreen>

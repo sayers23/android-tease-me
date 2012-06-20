@@ -3,10 +3,8 @@ package uk.co.ormand.teaseme;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
-//import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Timer;
@@ -32,6 +30,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.media.AudioManager;
+import android.media.MediaPlayer;
 import android.media.SoundPool;
 import android.net.Uri;
 import android.os.Bundle;
@@ -52,6 +51,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebView;
 import android.widget.Button;
+import android.widget.DigitalClock;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -88,10 +88,10 @@ public class AndroidTeaseMeActivity extends Activity {
 	private Boolean blnAutoSetPage;
 	private String strDelaySet;
 	private String strDelayUnSet;
-	private String strSounds[];
-	private int intSounds[];
-	private int intSoundCount;
+	private int intBtnLetters;
+	private MediaPlayer mMediaPlayer;
 	private static final String TAG = "ATM";
+	private String strTitle;
 
 	//TODO audio loop
 	//TODO about
@@ -120,6 +120,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
+			intBtnLetters = Integer.parseInt(sharedPrefs.getString("BtnLetters", "35"));
 			objSDRoot = Environment.getExternalStorageDirectory();
 			strPresentationPath = sharedPrefs.getString("PrefDir", "");
 			if (strPresentationPath == "") {
@@ -132,7 +133,14 @@ public class AndroidTeaseMeActivity extends Activity {
 			objWebView1 = (WebView) findViewById(R.id.webView1);
 			objWebView1.setBackgroundColor(0);
 			
+			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
+			objClock.setTextSize(MintFontSize);
+			
+			TextView objDebug = (TextView)  findViewById(R.id.textViewDebug);
+			objDebug.setTextSize(MintFontSize);
+			
 			objCountText = (TextView) findViewById(R.id.textViewTimer);
+			objCountText.setTextSize(MintFontSize);
 
 			objPresFolder = new File(strPresentationPath);
 			
@@ -160,6 +168,25 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 	}
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (mMediaPlayer != null) {
+            mMediaPlayer.stop();
+            mMediaPlayer.reset();
+        }
+    }
+
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (mMediaPlayer != null) {
+            mMediaPlayer.release();
+            mMediaPlayer = null;
+        }
+    }
+
 	@Override
 	protected void onResume() {
 		super.onResume();
@@ -167,8 +194,18 @@ public class AndroidTeaseMeActivity extends Activity {
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
+			intBtnLetters = Integer.parseInt(sharedPrefs.getString("BtnLetters", "35"));
 			objSDRoot = Environment.getExternalStorageDirectory();
 			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
+
+			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
+			objClock.setTextSize(MintFontSize);
+			
+			TextView objDebug = (TextView)  findViewById(R.id.textViewDebug);
+			objDebug.setTextSize(MintFontSize);
+			
+			objCountText.setTextSize(MintFontSize);
+			
 		} catch (NumberFormatException e) {
 			Log.e(TAG, "onResume Exception ", e);
 		} catch (Exception e) {
@@ -213,14 +250,17 @@ public class AndroidTeaseMeActivity extends Activity {
 		try {
 			switch (item.getItemId()) {
 			case 0:
+				//Load
 				loadFileList();
 				showDialog(DIALOG_LOAD_FILE);
 				return true;
-			case 2:
-				finish();
-				return true;
 			case 1:
+				//Preferences
 				startActivity(new Intent(this, QuickPrefsActivity.class));
+				return true;
+			case 2:
+				//Exit
+				finish();
 				return true;
 			}
 		} catch (Exception e) {
@@ -279,6 +319,10 @@ public class AndroidTeaseMeActivity extends Activity {
 			}
 
 			soundPool.stop(intSoundStream);
+	        if (mMediaPlayer != null) {
+	            mMediaPlayer.stop();
+	            mMediaPlayer.reset();
+	        }
 
 			// handle random page
 			strPageName = pageName;
@@ -415,7 +459,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					// text
 					tmpNodeList = elPage.getElementsByTagName("Text");
 					elText = tmpNodeList.item(0);
-					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:10 } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
+					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:" + MintFontSize + "px } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
 					objWebView1.loadData(strHTML, "text/html", null);
 					objWebView1.setBackgroundColor(color.black);
 					
@@ -488,7 +532,7 @@ public class AndroidTeaseMeActivity extends Activity {
 
 					// add new buttons
 					tmpNodeList = elPage.getElementsByTagName("Button");
-					intDpLeft = 35;
+					intDpLeft = intBtnLetters;
 					btnLayoutRow = new LinearLayout(this);
 					btnLayout.addView(btnLayoutRow);
 					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
@@ -527,7 +571,7 @@ public class AndroidTeaseMeActivity extends Activity {
 								btnDynamic.setTextSize(MintFontSize);
 								
 								if (intDpLeft < strBtnText.length() ) {
-									intDpLeft = 35;
+									intDpLeft = intBtnLetters;
 									btnLayoutRow = new LinearLayout(this);
 									btnLayout.addView(btnLayoutRow);
 									layout = btnLayout.getLayoutParams();
@@ -570,7 +614,7 @@ public class AndroidTeaseMeActivity extends Activity {
 							btnDynamic.setTextSize(MintFontSize);
 
 							if (intDpLeft < 5 ) {
-								intDpLeft = 35;
+								intDpLeft = intBtnLetters;
 								btnLayoutRow = new LinearLayout(this);
 								btnLayout.addView(btnLayoutRow);
 								layout = btnLayout.getLayoutParams();
@@ -595,7 +639,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						objDebugText.setText(" " + strPageName);
 					} else {
 						TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
-						objDebugText.setText("");
+						objDebugText.setText(strTitle);
 					}
 
 					// Audio / Metronome
@@ -618,17 +662,14 @@ public class AndroidTeaseMeActivity extends Activity {
 						}
 					} else {
 						// Audio
-						// Audio is stored in an array of sounds populated when
-						// we load the tease
 						tmpNodeList = elPage.getElementsByTagName("Audio");
 						elAudio = (Element) tmpNodeList.item(0);
 						if (elAudio != null) {
 							String strAudio = elAudio.getAttribute("id");
-							for (i = 0; i < intSoundCount; i++) {
-								if (strSounds[i].equals(strAudio)) {
-									intSoundStream = soundPool.play(intSounds[i], 1.0f, 1.0f, 0, 0, 1.0f);
-								}
-							}
+							mMediaPlayer = new MediaPlayer();
+		                    mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
+		                    mMediaPlayer.prepare();
+		                    mMediaPlayer.start();
 						}
 					}
 
@@ -645,10 +686,11 @@ public class AndroidTeaseMeActivity extends Activity {
 		NodeList objNodeList;
 		Element objMediaElement;
 		Element objAutoset;
-		NodeList objAudio;
-		Element objElAudio;
-		String strAudio;
-		boolean blnLoaded;
+		Element objTitle;
+		Element objAuthor;
+		String strTmpTitle;
+		String strTmpAuthor;
+		
 		try {
 			strPreXMLPath = strPresentationPath + xmlFileName;
 			File preXMLFile = new File(strPreXMLPath);
@@ -666,7 +708,33 @@ public class AndroidTeaseMeActivity extends Activity {
 			} else {
 				blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild().getNodeValue());
 			}
-
+			
+			//Title
+			objNodeList = objDocPresXML.getElementsByTagName("Title");
+			objTitle = (Element) objNodeList.item(0);
+			if (objTitle == null) {
+				strTmpTitle = "";
+			} else {
+				strTmpTitle = objTitle.getFirstChild().getNodeValue();
+			}
+			
+			//Author
+			objNodeList = objDocPresXML.getElementsByTagName("Author");
+			objAuthor = (Element) objNodeList.item(0);
+			if (objAuthor == null) {
+				strTmpAuthor = "";
+			} else {
+				objNodeList = objAuthor.getElementsByTagName("Name");
+				objAuthor = (Element) objNodeList.item(0);
+				if (objAuthor == null) {
+					strTmpAuthor = "";
+				} else { 
+					strTmpAuthor = objAuthor.getFirstChild().getNodeValue();
+				}
+			}
+			
+			strTitle = strTmpTitle + ", " + strTmpAuthor;
+			
 			// Media directory
 			objNodeList = objDocPresXML.getElementsByTagName("MediaDirectory");
 			objMediaElement = (Element) objNodeList.item(0);
@@ -676,30 +744,9 @@ public class AndroidTeaseMeActivity extends Activity {
 			objNodeList = objDocPresXML.getElementsByTagName("Pages");
 			objPagesElement = (Element) objNodeList.item(0);
 
-			// load all audio into a precompiled sound array
-			objAudio = objPagesElement.getElementsByTagName("Audio");
-			intSoundCount = 0;
-			strSounds = new String[objAudio.getLength()];
-			intSounds = new int[objAudio.getLength()];
 			soundPool = null;
 			soundPool = new SoundPool(1, AudioManager.STREAM_MUSIC, 0);
 			sound = soundPool.load(this, R.raw.tick, 1);
-			for (int i1 = objAudio.getLength() - 1; i1 >= 0; i1--) {
-				objElAudio = (Element) objAudio.item(i1);
-				strAudio = objElAudio.getAttribute("id");
-				blnLoaded = false;
-				for (int i2 = 0; i2 < intSoundCount; i2++) {
-					if (strSounds[i2].equals(strAudio)) {
-						blnLoaded = true;
-						break;
-					}
-				}
-				if (!blnLoaded) {
-					strSounds[intSoundCount] = strAudio;
-					intSounds[intSoundCount] = soundPool.load(strPresentationPath + strMediaDirectory + "/" + strAudio, 1);
-					intSoundCount++;
-				}
-			}
 		} catch (ParserConfigurationException e) {
 			Log.e(TAG, "loadXML ParserConfigurationException ", e);
 		} catch (SAXException e) {
