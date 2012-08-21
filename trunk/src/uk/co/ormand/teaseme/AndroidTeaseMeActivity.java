@@ -25,6 +25,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -37,12 +38,16 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.graphics.PointF;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
+import android.util.FloatMath;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
@@ -92,6 +97,7 @@ public class AndroidTeaseMeActivity extends Activity {
 	private MediaPlayer mMediaPlayer;
 	private static final String TAG = "ATM";
 	private String strTitle;
+	private Boolean blnImageZoomed;
 
 	//TODO audio loop
 	//TODO about
@@ -236,6 +242,37 @@ public class AndroidTeaseMeActivity extends Activity {
 		};
 	}
 
+	// onclick listener for imageview
+	View.OnClickListener getOnClickDoZoomImage(final ImageView imageview, final String imgPath ) {
+		return new View.OnClickListener() {
+			public void onClick(View v) {
+				try {
+					ViewGroup.LayoutParams layout;
+					ImageView objImageView;
+					objImageView = imageview;
+					if (blnImageZoomed) {
+						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2,intHeightTop));
+					} else {
+						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop,intHeightTop));
+					}
+					blnImageZoomed = !blnImageZoomed;
+					// Clear the parent layout
+					objLayoutImage.removeAllViews();
+					// add the new image to it and set it to fill the
+					// available area
+					objLayoutImage.addView(objImageView);
+					layout = objImageView.getLayoutParams();
+					layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+					layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+					objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+					objImageView.setLayoutParams(layout);
+				} catch (Exception e) {
+					Log.e(TAG, "OnClick Exception ", e);
+				}
+			}
+		};
+	}
+
 	// Prefernces Menu
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -346,7 +383,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						strPageArray = new String[intMax];
 						int intPageArrayCount = -1;
 						// Check if we are allowed to display the pages
-						for (int i = 1; i <= intMax; i++) {
+						for (int i = intMin; i <= intMax; i++) {
 							strPageName = strPre + i + strPost;
 							if (AllowedToShowPage(strPageName)) {
 								intPageArrayCount++;
@@ -454,6 +491,8 @@ public class AndroidTeaseMeActivity extends Activity {
 						layout.height = ViewGroup.LayoutParams.FILL_PARENT;
 						objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
 						objImageView.setLayoutParams(layout);
+						objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
+						blnImageZoomed = false;
 					}
 
 					// text
@@ -687,6 +726,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		Element objMediaElement;
 		Element objAutoset;
 		Element objTitle;
+		Node objTemp;
 		Element objAuthor;
 		String strTmpTitle;
 		String strTmpAuthor;
@@ -715,7 +755,12 @@ public class AndroidTeaseMeActivity extends Activity {
 			if (objTitle == null) {
 				strTmpTitle = "";
 			} else {
-				strTmpTitle = objTitle.getFirstChild().getNodeValue();
+				objTemp = objTitle.getFirstChild();
+				if (objTemp == null) {
+					strTmpTitle = "";
+				}else{
+					strTmpTitle = objTitle.getFirstChild().getNodeValue();
+				}
 			}
 			
 			//Author
@@ -729,7 +774,12 @@ public class AndroidTeaseMeActivity extends Activity {
 				if (objAuthor == null) {
 					strTmpAuthor = "";
 				} else { 
-					strTmpAuthor = objAuthor.getFirstChild().getNodeValue();
+					objTemp = objAuthor.getFirstChild();
+					if (objTemp == null) {
+						strTmpAuthor = "";
+					}else{
+						strTmpAuthor = objAuthor.getFirstChild().getNodeValue();
+					}
 				}
 			}
 			
