@@ -25,7 +25,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.app.Dialog;
-import android.content.Context;
+//import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -38,16 +38,16 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Matrix;
-import android.graphics.PointF;
+//import android.graphics.Matrix;
+//import android.graphics.PointF;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
-import android.util.FloatMath;
+//import android.util.FloatMath;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.MotionEvent;
+//import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
@@ -98,36 +98,52 @@ public class AndroidTeaseMeActivity extends Activity {
 	private static final String TAG = "ATM";
 	private String strTitle;
 	private Boolean blnImageZoomed;
+	private SharedPreferences objLocalVarianbles;
 
-	//TODO audio loop
-	//TODO about
-	//TODO vote
+	// TODO audio loop
+	// TODO about
+	// TODO vote
 	/** Called when the activity is first created. */
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
+		// Runs this code first
 		super.onCreate(savedInstanceState);
 		try {
+			// Set what the volume buttons do (so it will change the audio
+			// volume not the phone ringer volume)
 			setVolumeControlStream(AudioManager.STREAM_MUSIC);
+			// Turn off title bar
 			requestWindowFeature(Window.FEATURE_NO_TITLE);
+			// Force it to full screen
 			getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
+			// Set what screen layout to use
 			setContentView(R.layout.main);
 
+			// Random number generater object
 			rndGen = new Random();
 
+			// Get the size of the screen in pixels
 			DisplayMetrics dm = new DisplayMetrics();
 			getWindowManager().getDefaultDisplay().getMetrics(dm);
 
 			intHeightTop = dm.heightPixels;
 			intWidthTop = dm.widthPixels;
 
+			// Reference to the bit of the screen that displays the image
 			objLayoutImage = (LinearLayout) findViewById(R.id.LayoutImage);
 
+			// Get the current preferences
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+			// debug flag
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
+			// font size
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
+			// number of letters for buttons per row
 			intBtnLetters = Integer.parseInt(sharedPrefs.getString("BtnLetters", "35"));
+			// SD card location
 			objSDRoot = Environment.getExternalStorageDirectory();
+			// path to the xml files
 			strPresentationPath = sharedPrefs.getString("PrefDir", "");
 			if (strPresentationPath == "") {
 				SharedPreferences.Editor objPrefEdit = sharedPrefs.edit();
@@ -136,36 +152,49 @@ public class AndroidTeaseMeActivity extends Activity {
 				strPresentationPath = sharedPrefs.getString("PrefDir", "");
 			}
 
+			// Reference to the browser control that contains the text
 			objWebView1 = (WebView) findViewById(R.id.webView1);
+			// Set background colour to black
 			objWebView1.setBackgroundColor(0);
-			
+
+			// Clock control that displays the current time
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
 			objClock.setTextSize(MintFontSize);
-			
-			TextView objDebug = (TextView)  findViewById(R.id.textViewDebug);
+
+			// Text control that contains page name in debug mode or description
+			// if not
+			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
 			objDebug.setTextSize(MintFontSize);
-			
+
+			// Text control that contains the count down timer
 			objCountText = (TextView) findViewById(R.id.textViewTimer);
 			objCountText.setTextSize(MintFontSize);
 
+			// Refernce to the folder that contains the xml files
 			objPresFolder = new File(strPresentationPath);
-			
-			// write .nomedia
+
+			// write .nomedia file so any pictures or videos do not appear in
+			// the device gallery
 			@SuppressWarnings("unused")
 			boolean blnTry;
+			// if the folder does not exist create it
 			if (!objPresFolder.exists()) {
 				blnTry = objPresFolder.mkdirs();
 			}
+			// write the .nomedia file
 			File objNoMedia = new File(strPresentationPath + ".nomedia");
 			if (!objNoMedia.exists()) {
 				blnTry = objNoMedia.createNewFile();
 			}
 
+			// If a password is set then show the password dialogue
 			strPrefPassword = sharedPrefs.getString("Password", "");
 			if (!strPrefPassword.equals("")) {
 				this.showDialog(DIALOG_PASSWORD_ENTER);
+				//See onCreateDialog further down for what happens when they exit this
 			}
 
+			// array to hold the various flags
 			Flags = new ArrayList<String>();
 		} catch (NumberFormatException e) {
 			Log.e(TAG, "OnCreate NumberFormatException ", e);
@@ -174,27 +203,30 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 	}
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (mMediaPlayer != null) {
-            mMediaPlayer.stop();
-            mMediaPlayer.reset();
-        }
-    }
+	@Override
+	protected void onPause() {
+		super.onPause();
+		// If we go out of the app then stop any video / sounds that are
+		// currently playing
+		if (mMediaPlayer != null) {
+			mMediaPlayer.stop();
+			mMediaPlayer.reset();
+		}
+	}
 
-    
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (mMediaPlayer != null) {
-            mMediaPlayer.release();
-            mMediaPlayer = null;
-        }
-    }
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		if (mMediaPlayer != null) {
+			mMediaPlayer.release();
+			mMediaPlayer = null;
+		}
+	}
 
 	@Override
 	protected void onResume() {
+		// If we go out and the come back in we need to re-initialise variable
+		// that are lost in the process
 		super.onResume();
 		try {
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -206,12 +238,12 @@ public class AndroidTeaseMeActivity extends Activity {
 
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
 			objClock.setTextSize(MintFontSize);
-			
-			TextView objDebug = (TextView)  findViewById(R.id.textViewDebug);
+
+			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
 			objDebug.setTextSize(MintFontSize);
-			
+
 			objCountText.setTextSize(MintFontSize);
-			
+
 		} catch (NumberFormatException e) {
 			Log.e(TAG, "onResume Exception ", e);
 		} catch (Exception e) {
@@ -243,7 +275,8 @@ public class AndroidTeaseMeActivity extends Activity {
 	}
 
 	// onclick listener for imageview
-	View.OnClickListener getOnClickDoZoomImage(final ImageView imageview, final String imgPath ) {
+	// maximises or returns to normal size the image if it is tapped
+	View.OnClickListener getOnClickDoZoomImage(final ImageView imageview, final String imgPath) {
 		return new View.OnClickListener() {
 			public void onClick(View v) {
 				try {
@@ -251,9 +284,9 @@ public class AndroidTeaseMeActivity extends Activity {
 					ImageView objImageView;
 					objImageView = imageview;
 					if (blnImageZoomed) {
-						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2,intHeightTop));
+						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
 					} else {
-						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop,intHeightTop));
+						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop, intHeightTop));
 					}
 					blnImageZoomed = !blnImageZoomed;
 					// Clear the parent layout
@@ -278,7 +311,8 @@ public class AndroidTeaseMeActivity extends Activity {
 	public boolean onCreateOptionsMenu(Menu menu) {
 		menu.add(Menu.NONE, 0, 0, "Load");
 		menu.add(Menu.NONE, 1, 0, "Preferences");
-		menu.add(Menu.NONE, 2, 0, "Exit");
+		menu.add(Menu.NONE, 2, 0, "Restart");
+		menu.add(Menu.NONE, 3, 0, "Exit");
 		return super.onCreateOptionsMenu(menu);
 	}
 
@@ -287,16 +321,26 @@ public class AndroidTeaseMeActivity extends Activity {
 		try {
 			switch (item.getItemId()) {
 			case 0:
-				//Load
+				// Load
 				loadFileList();
 				showDialog(DIALOG_LOAD_FILE);
+				//See onCreateDialog further down for what happens when they exit this
 				return true;
 			case 1:
-				//Preferences
+				// Preferences
 				startActivity(new Intent(this, QuickPrefsActivity.class));
 				return true;
 			case 2:
-				//Exit
+				Flags = new ArrayList<String>();
+				SharedPreferences.Editor objPrefEdit;
+				objPrefEdit = objLocalVarianbles.edit();
+				objPrefEdit.putString("CurrentPage", "start");
+				objPrefEdit.putString("Flags", "");
+				objPrefEdit.commit();
+				displayPage("start");
+				return true;
+			case 3:
+				// Exit
 				finish();
 				return true;
 			}
@@ -308,6 +352,7 @@ public class AndroidTeaseMeActivity extends Activity {
 	}
 
 	public void displayPage(String pageName) {
+		// Main code that displays a page
 		String strId;
 		Element elPage;
 		Element elImage;
@@ -328,7 +373,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		int intMin;
 		int intMax;
 		int intDpLeft;
-		//*int intRows;
+		// *int intRows;
 		String strMin;
 		String strMax;
 		String strPre;
@@ -343,8 +388,9 @@ public class AndroidTeaseMeActivity extends Activity {
 		LinearLayout btnLayoutRow = null;
 		ViewGroup.LayoutParams layout;
 		ImageView objImageView;
-		VideoView objVideoView;
+		final VideoView objVideoView;
 		String imgPath = null;
+		String strFlags;
 
 		try {
 			if (tmrPageTimer != null) {
@@ -356,10 +402,10 @@ public class AndroidTeaseMeActivity extends Activity {
 			}
 
 			soundPool.stop(intSoundStream);
-	        if (mMediaPlayer != null) {
-	            mMediaPlayer.stop();
-	            mMediaPlayer.reset();
-	        }
+			if (mMediaPlayer != null) {
+				mMediaPlayer.stop();
+				mMediaPlayer.reset();
+			}
 
 			// handle random page
 			strPageName = pageName;
@@ -439,69 +485,80 @@ public class AndroidTeaseMeActivity extends Activity {
 						layout.width = ViewGroup.LayoutParams.FILL_PARENT;
 						layout.height = ViewGroup.LayoutParams.FILL_PARENT;
 						objVideoView.setVideoURI(Uri.parse(imgPath));
-						objVideoView.start();
+					    new Thread(new Runnable() {
+					        public void run() {
+								objVideoView.start();
+					        }
+					    }).start();							
 					} else {
 						// image
 						tmpNodeList = elPage.getElementsByTagName("Image");
 						elImage = (Element) tmpNodeList.item(0);
-						strImage = elImage.getAttribute("id");
-						int intSubDir = strImage.lastIndexOf("/");
-						String strSubDir;
-						if (intSubDir > -1) {
-							strSubDir = "/" + strImage.substring(0, intSubDir + 1);
-							strImage = strImage.substring(intSubDir + 1);
-						} else {
-							strSubDir = "";
-						}
-						// String strSubDir
-						// Handle wildcard *
-						if (strImage.indexOf("*") > -1) {
-							strFilePatern = strImage;
-							// get the directory
-							File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
-							// wildcard filter class handles the filtering
-							java.io.FileFilter WildCardfilter = new WildCardFileFilter();
-							if (f.isDirectory()) {
-								// return a list of matching files
-								File[] children = f.listFiles(WildCardfilter);
-								// return a random image
-								int intFile = rndGen.nextInt(children.length);
-								imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + children[intFile].getName();
+						if (elImage != null) {
+
+							strImage = elImage.getAttribute("id");
+							int intSubDir = strImage.lastIndexOf("/");
+							String strSubDir;
+							if (intSubDir > -1) {
+								strSubDir = "/" + strImage.substring(0, intSubDir + 1);
+								strImage = strImage.substring(intSubDir + 1);
+							} else {
+								strSubDir = "";
 							}
+							// String strSubDir
+							// Handle wildcard *
+							if (strImage.indexOf("*") > -1) {
+								strFilePatern = strImage;
+								// get the directory
+								File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
+								// wildcard filter class handles the filtering
+								java.io.FileFilter WildCardfilter = new WildCardFileFilter();
+								if (f.isDirectory()) {
+									// return a list of matching files
+									File[] children = f.listFiles(WildCardfilter);
+									// return a random image
+									int intFile = rndGen.nextInt(children.length);
+									imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + children[intFile].getName();
+								}
+							} else {
+								// no wildcard so just use the file name
+								imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + strImage;
+							}
+							// we create a new image view every time (we may
+							// have
+							// displayed a video last time)
+							objImageView = new ImageView(this);
+							// decodeSampledBitmapFromFile will resize the image
+							// before it gets to memory
+							// we can load large images using memory efficiently
+							// (and not run out of memory and crash the app)
+
+							objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
+							// Clear the parent layout
+							objLayoutImage.removeAllViews();
+							// add the new image to it and set it to fill the
+							// available area
+							objLayoutImage.addView(objImageView);
+							layout = objImageView.getLayoutParams();
+							layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+							layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+							objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+							objImageView.setLayoutParams(layout);
+							objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
+							blnImageZoomed = false;
 						} else {
-							// no wildcard so just use the file name
-							imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + strImage;
+							//No image
+							objLayoutImage.removeAllViews();
 						}
-						// we create a new image view every time (we may have
-						// displayed a video last time)
-						objImageView = new ImageView(this);
-						// decodeSampledBitmapFromFile will resize the image
-						// before it gets to memory
-						// we can load large images using memory efficiently
-						// (and not run out of memory and crash the app)
-						
-						objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2,intHeightTop));
-						// Clear the parent layout
-						objLayoutImage.removeAllViews();
-						// add the new image to it and set it to fill the
-						// available area
-						objLayoutImage.addView(objImageView);
-						layout = objImageView.getLayoutParams();
-						layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
-						layout.height = ViewGroup.LayoutParams.FILL_PARENT;
-						objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-						objImageView.setLayoutParams(layout);
-						objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
-						blnImageZoomed = false;
 					}
 
 					// text
 					tmpNodeList = elPage.getElementsByTagName("Text");
 					elText = tmpNodeList.item(0);
-					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:" + MintFontSize + "px } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
+					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:"
+							+ MintFontSize + "px } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
 					objWebView1.loadData(strHTML, "text/html", null);
 					objWebView1.setBackgroundColor(color.black);
-					
 
 					// delay
 					//
@@ -536,6 +593,7 @@ public class AndroidTeaseMeActivity extends Activity {
 							if (!strSet.equals("")) {
 								strDelayUnSet = strSet;
 							}
+
 							// handle random Delay
 							intPos1 = strDelSeconds.indexOf("(");
 							intDelSeconds = 0;
@@ -608,8 +666,8 @@ public class AndroidTeaseMeActivity extends Activity {
 								Button btnDynamic = new Button(this);
 								btnDynamic.setText(strBtnText);
 								btnDynamic.setTextSize(MintFontSize);
-								
-								if (intDpLeft < strBtnText.length() ) {
+
+								if (intDpLeft < strBtnText.length()) {
 									intDpLeft = intBtnLetters;
 									btnLayoutRow = new LinearLayout(this);
 									btnLayout.addView(btnLayoutRow);
@@ -652,7 +710,7 @@ public class AndroidTeaseMeActivity extends Activity {
 							btnDynamic.setText("Delay");
 							btnDynamic.setTextSize(MintFontSize);
 
-							if (intDpLeft < 5 ) {
+							if (intDpLeft < 5) {
 								intDpLeft = intBtnLetters;
 								btnLayoutRow = new LinearLayout(this);
 								btnLayout.addView(btnLayoutRow);
@@ -704,52 +762,96 @@ public class AndroidTeaseMeActivity extends Activity {
 						tmpNodeList = elPage.getElementsByTagName("Audio");
 						elAudio = (Element) tmpNodeList.item(0);
 						if (elAudio != null) {
-							String strAudio = elAudio.getAttribute("id");
-							mMediaPlayer = new MediaPlayer();
-		                    mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
-		                    mMediaPlayer.prepare();
-		                    mMediaPlayer.start();
+						    final String strAudio = elAudio.getAttribute("id");
+						    new Thread(new Runnable() {
+						        public void run() {
+									mMediaPlayer = new MediaPlayer();
+									try {
+										mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
+										mMediaPlayer.prepare();
+									} catch (IllegalArgumentException e) {
+										Log.e(TAG, "displayPage IllegalArgumentException ", e);
+									} catch (IllegalStateException e) {
+										Log.e(TAG, "displayPage IllegalStateException ", e);
+									} catch (IOException e) {
+										Log.e(TAG, "displayPage IOException ", e);
+									}
+									mMediaPlayer.start();
+						        }
+						    }).start();							
 						}
 					}
 
 					break;
 				}
 			}
+
+			// Save current page and flags
+			SharedPreferences.Editor objPrefEdit;
+			objPrefEdit = objLocalVarianbles.edit();
+			objPrefEdit.putString("CurrentPage", strPageName);
+			strFlags = GetFlags();
+			objPrefEdit.putString("Flags", strFlags);
+			objPrefEdit.commit();
+			
 		} catch (Exception e) {
 			Log.e(TAG, "displayPage Exception ", e);
 		}
 	}
+	
+	public void saveXML(Document ObjXML) {
+		
+	}
 
-	public void loadXML(String xmlFileName) {
-		String strPreXMLPath;
+	public String loadXML(String xmlFileName) {
 		NodeList objNodeList;
 		Element objMediaElement;
 		Element objAutoset;
 		Element objTitle;
+		Element objSettings;
 		Node objTemp;
 		Element objAuthor;
 		String strTmpTitle;
 		String strTmpAuthor;
-		
+		String strPage = "start";
+		String strFlags;
+		String strPreXMLPath;
+
 		try {
+			objLocalVarianbles = getSharedPreferences(xmlFileName, MODE_PRIVATE);
+			Flags = new ArrayList<String>();
 			strPreXMLPath = strPresentationPath + xmlFileName;
 			File preXMLFile = new File(strPreXMLPath);
 			objDocumentBuilderFactory = DocumentBuilderFactory.newInstance();
 			objDocumentBuilder = objDocumentBuilderFactory.newDocumentBuilder();
 			objDocPresXML = objDocumentBuilder.parse(preXMLFile);
 			objDocPresXML.getDocumentElement().normalize();
-
-			// AutoSetPageWhenSeen
-			objNodeList = objDocPresXML.getElementsByTagName("AutoSetPageWhenSeen");
-			objAutoset = (Element) objNodeList.item(0);
-
-			if (objAutoset == null) {
-				blnAutoSetPage = false;
-			} else {
-				blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild().getNodeValue());
-			}
 			
-			//Title
+			objNodeList = objDocPresXML.getElementsByTagName("Settings");
+			objSettings = (Element)  objNodeList.item(0);
+			if (objSettings == null) {
+				blnAutoSetPage = false;
+			}
+			else {
+				// AutoSetPageWhenSeen
+				objNodeList = objSettings.getElementsByTagName("AutoSetPageWhenSeen");
+				objAutoset = (Element) objNodeList.item(0);
+
+				if (objAutoset == null) {
+					blnAutoSetPage = false;
+				} else {
+					blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild().getNodeValue());
+				}
+			}
+
+			// Return to where we left off
+			strPage = objLocalVarianbles.getString("CurrentPage", "start");
+			strFlags = objLocalVarianbles.getString("Flags", "");
+			if (strFlags != "") {
+				SetFlags(strFlags);
+			}
+
+			// Title
 			objNodeList = objDocPresXML.getElementsByTagName("Title");
 			objTitle = (Element) objNodeList.item(0);
 			if (objTitle == null) {
@@ -758,12 +860,12 @@ public class AndroidTeaseMeActivity extends Activity {
 				objTemp = objTitle.getFirstChild();
 				if (objTemp == null) {
 					strTmpTitle = "";
-				}else{
+				} else {
 					strTmpTitle = objTitle.getFirstChild().getNodeValue();
 				}
 			}
-			
-			//Author
+
+			// Author
 			objNodeList = objDocPresXML.getElementsByTagName("Author");
 			objAuthor = (Element) objNodeList.item(0);
 			if (objAuthor == null) {
@@ -773,18 +875,18 @@ public class AndroidTeaseMeActivity extends Activity {
 				objAuthor = (Element) objNodeList.item(0);
 				if (objAuthor == null) {
 					strTmpAuthor = "";
-				} else { 
+				} else {
 					objTemp = objAuthor.getFirstChild();
 					if (objTemp == null) {
 						strTmpAuthor = "";
-					}else{
+					} else {
 						strTmpAuthor = objAuthor.getFirstChild().getNodeValue();
 					}
 				}
 			}
-			
+
 			strTitle = strTmpTitle + ", " + strTmpAuthor;
-			
+
 			// Media directory
 			objNodeList = objDocPresXML.getElementsByTagName("MediaDirectory");
 			objMediaElement = (Element) objNodeList.item(0);
@@ -806,9 +908,12 @@ public class AndroidTeaseMeActivity extends Activity {
 		} catch (Exception e) {
 			Log.e(TAG, "loadXML Exception ", e);
 		}
+		return strPage;
 	}
 
 	private String getInnerXml(Node objXMLNode, boolean blnTopNode) {
+		// Helper function to return the xml below a node as text
+		// Used to get the html from the text node as a string
 		String strXML;
 		String strTemp;
 		Node objTmpElement;
@@ -908,14 +1013,18 @@ public class AndroidTeaseMeActivity extends Activity {
 		@Override
 		public void run() {
 			try {
-				intSoundStream = soundPool.play(sound, 1.0f, 1.0f, 0, 0, 1.0f);
+			    new Thread(new Runnable() {
+			        public void run() {
+						intSoundStream = soundPool.play(sound, 1.0f, 1.0f, 0, 0, 1.0f);
+			        }
+			    }).start();
 			} catch (Exception e) {
 				Log.e(TAG, "MetronomeTask.run Exception ", e);
 			}
 		}
 	}
 
-	// Get xml file
+	// Get xml files
 	private String[] mFileList;
 	private String mChosenFile;
 	private static final String FTYPE = ".xml";
@@ -959,9 +1068,10 @@ public class AndroidTeaseMeActivity extends Activity {
 				}
 				builder.setItems(mFileList, new DialogInterface.OnClickListener() {
 					public void onClick(DialogInterface dialog, int which) {
+						String strPage;
 						mChosenFile = mFileList[which];
-						loadXML(mChosenFile);
-						displayPage("start");
+						strPage = loadXML(mChosenFile);
+						displayPage(strPage);
 					}
 				});
 				dialog = builder.show();
@@ -979,6 +1089,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						dialog.dismiss();
 						strPasswordEntered = text;
 						if (!strPasswordEntered.equals(strPrefPassword)) {
+							// If the password is wrong exit the app
 							finish();
 						}
 					}
@@ -1035,7 +1146,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				// Raw height and width of image
 				final int height = options.outHeight;
 				final int width = options.outWidth;
-				
+
 				if (width > reqWidth) {
 					inSampleSize = Math.round((float) width / (float) reqWidth);
 				} else if (height > reqHeight) {
@@ -1047,21 +1158,21 @@ public class AndroidTeaseMeActivity extends Activity {
 
 				// Decode bitmap with inSampleSize set
 				options.inJustDecodeBounds = false;
-				
+
 				objBitMap = BitmapFactory.decodeFile(strFile, options);
-				fltRatio =  (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
+				fltRatio = (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
 				if (fltRatio > 1) {
-					//portrait
+					// portrait
 					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
 				} else {
-					//landscape
+					// landscape
 					objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), false);
 				}
 			} catch (Exception e) {
 				Log.e(TAG, "calculateInSampleSize Exception ", e);
 				return null;
 			}
-			
+
 			return objBitMap;
 		} catch (Exception e) {
 			Log.e(TAG, "decodeSampledBitmapFromFile Exception ", e);
@@ -1082,6 +1193,19 @@ public class AndroidTeaseMeActivity extends Activity {
 		} catch (Exception e) {
 			Log.e(TAG, "SetFlags Exception ", e);
 		}
+	}
+
+	private String GetFlags() {
+		String strFlags = "";
+		try {
+			for (int i = 0; i < Flags.size(); i++) {
+				strFlags = strFlags + "," + Flags.get(i);
+			}
+			
+		} catch (Exception e) {
+			Log.e(TAG, "SetFlags Exception ", e);
+		}
+		return strFlags;
 	}
 
 	private void UnsetFlags(String flagNames) {
