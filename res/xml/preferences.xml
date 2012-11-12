@@ -26,4 +26,10 @@
         android:key="BtnLetters"
         android:summary="Number of letters for dynamic buttons per row"
         android:title="Button Letters per Row" />
+    <CheckBoxPreference
+        android:defaultValue="false"
+        android:key="FullScreen"
+        android:summaryOff="Classic Tease Me view"
+        android:summaryOn="Displays images fullscreen with text and buttons over the top"
+        android:title="Full Screen Mode"/>
 </PreferenceScreen>
