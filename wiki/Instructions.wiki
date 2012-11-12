@@ -18,3 +18,5 @@ Dynamic buttons mean it is hard to guess how many buttons per row.
 The if the total number of characters for buttons on the current row exceeds this number it will start a new row.
 If there are too few buttons on a row increase the number.
 If buttons are over flowing the row reduce the number.
+
+New full screen mode select-able in preferences will display the image full screen with the text and buttons on top 
