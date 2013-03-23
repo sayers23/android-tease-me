@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+
     <EditTextPreference
         android:key="Password"
         android:password="true"
@@ -10,11 +11,13 @@
         android:key="FontSize"
         android:summary="Font size to display screen"
         android:title="Font Size" />
+
     <CheckBoxPreference
         android:defaultValue="false"
         android:key="Debug"
         android:summary="Turn debug features on"
         android:title="Debug" />
+
     <EditTextPreference
         android:defaultValue=""
         android:key="PrefDir"
@@ -26,10 +29,20 @@
         android:key="BtnLetters"
         android:summary="Number of letters for dynamic buttons per row"
         android:title="Button Letters per Row" />
+
     <CheckBoxPreference
         android:defaultValue="false"
         android:key="FullScreen"
         android:summaryOff="Classic Tease Me view"
         android:summaryOn="Displays images fullscreen with text and buttons over the top"
-        android:title="Full Screen Mode"/>
+        android:title="Full Screen Mode" />
+
+    <ListPreference
+        android:defaultValue="NAME"
+        android:entries="@array/LoadSortName"
+        android:entryValues="@array/LoadSortValue"
+        android:key="SortOrder"
+        android:summary="Sort order when loading teases"
+        android:title="Sort Order" />
+
 </PreferenceScreen>
