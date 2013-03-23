@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -16,11 +17,13 @@ import javax.xml.parsers.ParserConfigurationException;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 import android.R.color;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
@@ -67,6 +70,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.VideoView;
 
+@SuppressLint("DefaultLocale")
 public class AndroidTeaseMeActivity extends Activity {
 	private File objSDRoot;
 	private File objPresFolder;
@@ -110,8 +114,8 @@ public class AndroidTeaseMeActivity extends Activity {
 	private int intAudioLoops;
 	private String strAudio;
 	private String strAudioTarget;
+	private String strLoadSortOrder;
 
-	// TODO audio loop
 	// TODO about
 	// TODO vote
 	/** Called when the activity is first created. */
@@ -162,6 +166,8 @@ public class AndroidTeaseMeActivity extends Activity {
 			}
 			//Image Full Screen default false
 			blnImageBackground = sharedPrefs.getBoolean("FullScreen", false);
+			//Load Sort Order
+			strLoadSortOrder = sharedPrefs.getString("SortOrder", "NAME");
 
 			// Reference to the browser control that contains the text
 			objWebView1 = (WebView) findViewById(R.id.webView1);
@@ -266,6 +272,8 @@ public class AndroidTeaseMeActivity extends Activity {
 			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
 			//Image Full Screen default false
 			blnImageBackground = sharedPrefs.getBoolean("FullScreen", false);
+			strLoadSortOrder = sharedPrefs.getString("SortOrder", "NAME");
+
 
 
 			// Clock control that displays the current time
@@ -369,11 +377,27 @@ public class AndroidTeaseMeActivity extends Activity {
 	// Prefernces Menu
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
-		menu.add(Menu.NONE, 0, 0, "Load");
-		menu.add(Menu.NONE, 1, 0, "Preferences");
-		menu.add(Menu.NONE, 2, 0, "Restart");
-		menu.add(Menu.NONE, 3, 0, "Exit");
+		menu.add(Menu.NONE, 0, 1, "Load");
+		menu.add(Menu.NONE, 1, 2, "Preferences");
+		menu.add(Menu.NONE, 2, 3, "Restart");
+		if (blnDebug) {
+			menu.add(Menu.NONE, 4, 4, "Goto Page");
+		}
+		menu.add(Menu.NONE, 3, 5, "Exit");
 		return super.onCreateOptionsMenu(menu);
+	}
+
+	@Override
+	public boolean onPrepareOptionsMenu(Menu menu) {
+		menu.clear();
+		menu.add(Menu.NONE, 0, 1, "Load");
+		menu.add(Menu.NONE, 1, 2, "Preferences");
+		menu.add(Menu.NONE, 2, 3, "Restart");
+		if (blnDebug) {
+			menu.add(Menu.NONE, 4, 4, "Goto Page");
+		}
+		menu.add(Menu.NONE, 3, 5, "Exit");
+		return super.onPrepareOptionsMenu(menu);
 	}
 
 	@Override
@@ -383,6 +407,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			case 0:
 				// Load
 				loadFileList();
+				removeDialog(DIALOG_LOAD_FILE);
 				showDialog(DIALOG_LOAD_FILE);
 				// See onCreateDialog further down for what happens when they
 				// exit this
@@ -393,6 +418,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				Log.d(TAG, "Edit Pref returning ");
 				return true;
 			case 2:
+				//Restart
 				Flags = new ArrayList<String>();
 				SharedPreferences.Editor objPrefEdit;
 				objPrefEdit = objLocalVarianbles.edit();
@@ -404,6 +430,12 @@ public class AndroidTeaseMeActivity extends Activity {
 			case 3:
 				// Exit
 				finish();
+				return true;
+			case 4:
+				// goto page
+				showDialog(DIALOG_SHOW_PAGE);
+				// See onCreateDialog further down for what happens when they
+				// exit this
 				return true;
 			}
 		} catch (Exception e) {
@@ -435,6 +467,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		int intMin;
 		int intMax;
 		int intDpLeft;
+		int intBtnLen;
 		// *int intRows;
 		String strMin;
 		String strMax;
@@ -444,12 +477,17 @@ public class AndroidTeaseMeActivity extends Activity {
 		String strSet;
 		String strTest;
 		String strStartAt;
+		String strStopAt;
+		String strDelStartAt;
+		int intDelStartAt;
 		int intStartAt;
+		int intStopAt;
 		boolean blnTestSet;
 		boolean blnTestNotSet;
 		NodeList pageNodeList;
 		NodeList tmpNodeList;
 		LinearLayout btnLayoutRow = null;
+		LinearLayout.LayoutParams btnLayoutParm;
 		ViewGroup.LayoutParams layout;
 		ImageView objImageView;
 		final VideoView objVideoView;
@@ -515,6 +553,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						if (intPageArrayCount > 0) {
 							// show one of the allowed random pages
 							i1 = mRandom.nextInt(intPageArrayCount + 1);
+							Log.d(TAG, "random number between 0 and " + intPageArrayCount + " generates " + i1);
 						}
 						strPageName = strPageArray[i1];
 						Log.d(TAG, "displayPage PageChosen " + strPageName);
@@ -583,6 +622,31 @@ public class AndroidTeaseMeActivity extends Activity {
 							Log.e(TAG, "displayPage startat Exception " + e1.getLocalizedMessage());
 						}
 
+						strStopAt = elImage.getAttribute("stop-at");
+						Log.d(TAG, "displayPage Video Stop At " + strStopAt);
+						intStopAt = 0;
+						try {
+							if (strStopAt != "") {
+								intPos1 = strStopAt.indexOf(":");
+								if (intPos1 > -1) {
+									intPos2 = strStopAt.indexOf(":", intPos1 + 1);
+									if (intPos2 > -1) {
+										strHour = strStopAt.substring(0, intPos1);
+										strMinute = strStopAt.substring(intPos1 + 1, intPos2);
+										strSecond = strStopAt.substring(intPos2 + 1, strStopAt.length());
+										Log.d(TAG, "displayPage Video Stop At Hour " + strHour + " Minute " + strMinute + " Second " + strSecond);
+										intStopAt = Integer.parseInt(strSecond) * 1000;
+										intStopAt = intStopAt + Integer.parseInt(strMinute) * 1000 * 60;
+										intStopAt = intStopAt + Integer.parseInt(strHour) * 1000 * 60 * 60;
+									}
+								}
+							}
+						} catch (Exception e1) {
+							intStartAt = 0;
+							Log.e(TAG, "displayPage stopat Exception " + e1.getLocalizedMessage());
+						}
+
+						
 						imgPath = strPresentationPath + strMediaDirectory + "/" + strImage;
 						Log.d(TAG, "displayPage Video full path " + imgPath);
 						objVideoView = new VideoView(this);
@@ -665,6 +729,7 @@ public class AndroidTeaseMeActivity extends Activity {
 										// we can load large images using memory
 										// efficiently
 										// (and not run out of memory and crash the app)
+										
 										// Clear the parent layout
 										objLayoutImage.removeAllViews();
 										Bitmap objRetBitMap;
@@ -734,28 +799,30 @@ public class AndroidTeaseMeActivity extends Activity {
 					tmpNodeList = elPage.getElementsByTagName("Text");
 					try {
 						elText = tmpNodeList.item(0);
+						String strTemp = getInnerXml(elText, true);
+						strTemp = strTemp.replace("<P>", "");
+						strTemp = strTemp.replace("<p>", "");
+						strTemp = strTemp.replace("</P>", "<br>");
+						strTemp = strTemp.replace("</p>", "<br>");
+						strTemp = strTemp.replace("<DIV>", "");
+						strTemp = strTemp.replace("<div>", "");
+						strTemp = strTemp.replace("</DIV>", "<br>");
+						strTemp = strTemp.replace("</div>", "<br>");
+						if (strTemp.endsWith("<br>")) {
+							strTemp = strTemp.substring(0, strTemp.length() - 4);
+						}
 						if (!blnImageBackground) {
 							strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:"
-									+ MintFontSize + "px } </style></head><body>" + getInnerXml(elText, true) + "</body></html>";
-							objWebView1.loadData(strHTML, "text/html", null);
+									+ MintFontSize + "px } </style></head><body>" + strTemp + "</body></html>";
+							//objWebView1.loadData(strHTML, "text/html", null);
+							objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
 							objWebView1.setBackgroundColor(color.black);
 						} else {
-							String strTemp = getInnerXml(elText, true);
-							strTemp = strTemp.replace("<P>", "");
-							strTemp = strTemp.replace("<p>", "");
-							strTemp = strTemp.replace("</P>", "<br>");
-							strTemp = strTemp.replace("</p>", "<br>");
-							strTemp = strTemp.replace("<DIV>", "");
-							strTemp = strTemp.replace("<div>", "");
-							strTemp = strTemp.replace("</DIV>", "<br>");
-							strTemp = strTemp.replace("</div>", "<br>");
-							if (strTemp.endsWith("<br>")) {
-								strTemp = strTemp.substring(0, strTemp.length() - 4);
-							}
 							
 							strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: rgba(0,0,0,0); font-family: Tahoma; font-size:"
 									+ MintFontSize + "px } div {background-color: rgba(0,0,0,0.25); position: absolute; bottom: 0} </style></head><body><div>" + strTemp + "</div></body></html>";
-							objWebView1.loadData(strHTML, "text/html", null);
+							//objWebView1.loadData(strHTML, "text/html", null);
+							objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
 							objWebView1.setBackgroundColor(0);
 						}
 					} catch (Exception e1) {
@@ -794,6 +861,12 @@ public class AndroidTeaseMeActivity extends Activity {
 								strDelSeconds = elDelay.getAttribute("seconds");
 								strDelStyle = elDelay.getAttribute("style");
 								strDelTarget = elDelay.getAttribute("target");
+								strDelStartAt = elDelay.getAttribute("start-with");
+								try {
+									intDelStartAt = Integer.parseInt(strDelStartAt);
+								} catch (Exception etemp) {
+									intDelStartAt = 0;
+								}
 								// record any delay set / unset
 								strSet = elDelay.getAttribute("set");
 								if (!strSet.equals("")) {
@@ -825,9 +898,14 @@ public class AndroidTeaseMeActivity extends Activity {
 								} else {
 									intDelSeconds = Integer.parseInt(strDelSeconds);
 								}
-								intDelSeconds = intDelSeconds * 1000;
-								tmrPageTimer = new PageTimer(intDelSeconds, 1000);
-								tmrPageTimer.start();
+								if (intDelSeconds == 0) { 
+									tmrPageTimer = new PageTimer(250, 0, 250);
+									tmrPageTimer.start();
+								} else {
+									intDelSeconds = intDelSeconds * 1000;
+									tmrPageTimer = new PageTimer(intDelSeconds, intDelStartAt, 1000);
+									tmrPageTimer.start();
+								}
 							}
 						} else {
 							objCountText.setText("");
@@ -847,6 +925,11 @@ public class AndroidTeaseMeActivity extends Activity {
 					intDpLeft = intBtnLetters;
 					btnLayoutRow = new LinearLayout(this);
 					btnLayout.addView(btnLayoutRow);
+					layout = btnLayoutRow.getLayoutParams();
+					layout.height = LayoutParams.WRAP_CONTENT;
+					layout.width = LayoutParams.FILL_PARENT;
+					btnLayoutRow.setLayoutParams(layout);
+					btnLayoutRow.setWeightSum(intBtnLetters);
 					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
 						try {
 							elButton = (Element) tmpNodeList.item(i1);
@@ -881,21 +964,28 @@ public class AndroidTeaseMeActivity extends Activity {
 										}
 									}
 									strBtnText = buffer.toString();
+									intBtnLen = strBtnText.length();
+									if (intBtnLen < 5) {
+										intBtnLen = 5;
+									}
 									Button btnDynamic = new Button(this);
 									btnDynamic.setText(strBtnText);
 									btnDynamic.setTextSize(MintFontSize);
-									btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_default_normal));
+									//btnDynamic.setShadowLayer(2, 1, 1, 0xffffff);
+									btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_black_glossy));
+									btnDynamic.setTextColor(Color.WHITE);
 
-									if (intDpLeft < strBtnText.length()) {
+									if (intDpLeft < intBtnLen) {
 										intDpLeft = intBtnLetters;
 										btnLayoutRow = new LinearLayout(this);
-										btnLayout.addView(btnLayoutRow);
-										layout = btnLayout.getLayoutParams();
+										layout = btnLayoutRow.getLayoutParams();
 										layout.height = LayoutParams.WRAP_CONTENT;
-										layout.width = LayoutParams.WRAP_CONTENT;
-										btnLayout.setLayoutParams(layout);
+										layout.width = LayoutParams.FILL_PARENT;
+										btnLayoutRow.setLayoutParams(layout);
+										btnLayoutRow.setWeightSum(intBtnLetters);
+										btnLayout.addView(btnLayoutRow);
 									}
-									intDpLeft = intDpLeft - (strBtnText.length() + 3);
+									intDpLeft = intDpLeft - intBtnLen;
 
 									// record any button set / unset
 									String strButtonSet;
@@ -918,10 +1008,15 @@ public class AndroidTeaseMeActivity extends Activity {
 									btnDynamic.setTag(R.string.TagPage, strBtnTarget);
 									btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
 									btnLayoutRow.addView(btnDynamic);
-									layout = btnDynamic.getLayoutParams();
-									layout.width = LayoutParams.WRAP_CONTENT;
-									layout.height = LayoutParams.WRAP_CONTENT;
-									btnDynamic.setLayoutParams(layout);
+									btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
+									btnLayoutParm.width = 0;
+									btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
+									if (blnImageBackground) {
+										btnLayoutParm.weight = intBtnLen;
+									} else {
+										btnLayoutParm.weight = intBtnLen * 2;
+									}
+									btnDynamic.setLayoutParams(btnLayoutParm);
 								}
 							}
 						} catch (Exception e1) {
@@ -937,14 +1032,16 @@ public class AndroidTeaseMeActivity extends Activity {
 								btnDynamic.setTextSize(MintFontSize);
 								btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_default_normal));
 
-								if (intDpLeft < 5) {
+								if (intDpLeft < 8) {
 									intDpLeft = intBtnLetters;
 									btnLayoutRow = new LinearLayout(this);
-									btnLayout.addView(btnLayoutRow);
-									layout = btnLayout.getLayoutParams();
+									layout = btnLayoutRow.getLayoutParams();
 									layout.height = LayoutParams.WRAP_CONTENT;
-									layout.width = LayoutParams.WRAP_CONTENT;
-									btnLayout.setLayoutParams(layout);
+									layout.width = LayoutParams.FILL_PARENT;
+									btnLayoutRow.setLayoutParams(layout);
+									btnLayoutRow.setWeightSum(intBtnLetters);
+									btnLayout.addView(btnLayoutRow);
+
 								} else {
 									intDpLeft = intDpLeft - 8;
 								}
@@ -954,10 +1051,16 @@ public class AndroidTeaseMeActivity extends Activity {
 								btnDynamic.setTag(R.string.TagPage, strDelTarget);
 								btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
 								btnLayoutRow.addView(btnDynamic);
-								layout = btnDynamic.getLayoutParams();
-								layout.width = LayoutParams.WRAP_CONTENT;
-								layout.height = LayoutParams.WRAP_CONTENT;
-								btnDynamic.setLayoutParams(layout);
+
+								btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
+								btnLayoutParm.width = 0;
+								btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
+								if (blnImageBackground) {
+									btnLayoutParm.weight = 8;
+								} else {
+									btnLayoutParm.weight = 16;
+								}
+								btnDynamic.setLayoutParams(btnLayoutParm);
 							}
 							TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
 							objDebugText.setText(" " + strPageName);
@@ -1004,22 +1107,28 @@ public class AndroidTeaseMeActivity extends Activity {
 								Log.d(TAG, "displayPage Audio " + strAudio);
 								strAudioTarget = elImage.getAttribute("target");
 								Log.d(TAG, "displayPage Audio target " + strAudioTarget);
+								// run audio on another thread
 								new Thread(new Runnable() {
 									public void run() {
 										mMediaPlayer = new MediaPlayer();
 										try {
 											mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
 											mMediaPlayer.prepare();
+											// if we have a target or a number of loops do some additional processing
 											if (!strAudioTarget.equals("") || intAudioLoops > 0) {
 												Log.d(TAG, "displayPage Audio.setOnCompletionListener set target " + strAudioTarget + " loops " + intAudioLoops);
+												//set a listener for the end of the audio
 												mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 													public void onCompletion(MediaPlayer mp) {
+														//if we still need to loop play it again
 														if (intAudioLoops > 0) {
 															Log.d(TAG, "displayPage Audio.setOnCompletionListener Loop " + intAudioLoops);
 															intAudioLoops = intAudioLoops - 1;
+															//restart the audio
 															mMediaPlayer.stop();
 															mMediaPlayer.start();
 														} else {
+															//if we don't need to loop and we have a target display the target page
 															if (!strAudioTarget.equals("")) {
 																Log.d(TAG, "displayPage Audio.setOnCompletionListener display " + strAudioTarget);
 																displayPage(strAudioTarget);
@@ -1036,6 +1145,7 @@ public class AndroidTeaseMeActivity extends Activity {
 											Log.e(TAG, "displayPage IOException ", e);
 										}
 										Log.d(TAG, "displayPage Audio Start");
+										//start the audio
 										mMediaPlayer.start();
 									}
 								}).start();
@@ -1061,10 +1171,6 @@ public class AndroidTeaseMeActivity extends Activity {
 		} catch (Exception e) {
 			Log.e(TAG, "displayPage Exception ", e);
 		}
-	}
-
-	public void saveXML(Document ObjXML) {
-
 	}
 
 	public String loadXML(String xmlFileName) {
@@ -1179,6 +1285,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			objNodeList = objDocPresXML.getElementsByTagName("Pages");
 			objPagesElement = (Element) objNodeList.item(0);
 
+			//Metronome sound
 			soundPool = null;
 			soundPool = new SoundPool(1, AudioManager.STREAM_MUSIC, 0);
 			sound = soundPool.load(this, R.raw.tick, 1);
@@ -1199,14 +1306,27 @@ public class AndroidTeaseMeActivity extends Activity {
 		// Used to get the html from the text node as a string
 		String strXML;
 		String strTemp;
+		String strAttributes;
 		Node objTmpElement;
 		NodeList tmpNodeList;
+		NamedNodeMap objAttr;
+		Node objAttrNode;
 		strXML = "";
 		try {
 			if (objXMLNode != null) {
 				if (objXMLNode.getNodeType() == Node.ELEMENT_NODE) {
 					if (!blnTopNode) {
-						strXML = "<" + objXMLNode.getNodeName() + ">";
+						if (objXMLNode.hasAttributes()){
+							strAttributes = "";
+							objAttr = objXMLNode.getAttributes();
+							for (int i = 0; i < objAttr.getLength(); i++){
+								objAttrNode = objAttr.item(i);
+								strAttributes = strAttributes + " " + objAttrNode.getNodeName() + "=\"" + objAttrNode.getNodeValue() + "\"";
+							}
+						} else {
+							strAttributes = "";
+						}
+						strXML = "<" + objXMLNode.getNodeName() + strAttributes + ">";
 					}
 					tmpNodeList = objXMLNode.getChildNodes();
 					for (int i = 0; i < tmpNodeList.getLength(); i++) {
@@ -1231,10 +1351,13 @@ public class AndroidTeaseMeActivity extends Activity {
 
 	// delay timer
 	class PageTimer extends CountDownTimer {
-		public PageTimer(long millisInFuture, long countDownInterval) {
+		Long lngStartOffset;
+		
+		public PageTimer(long millisInFuture, long offset, long countDownInterval) {
 			super(millisInFuture, countDownInterval);
-			Long tmpLong = (Long) millisInFuture / 1000;
-			objCountText.setText(tmpLong.toString());
+			lngStartOffset = offset;
+			//Long tmpLong = (Long) millisInFuture / 1000;
+			//objCountText.setText(tmpLong.toString());
 		}
 
 		// display the target page
@@ -1267,6 +1390,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			try {
 				if (strDelStyle.equals("normal")) {
 					Long tmpLong = (Long) millisUntilFinished / 1000;
+					tmpLong = tmpLong + lngStartOffset;
 					Long tmpMinutes = (Long) tmpLong / 60;
 					Long tmpSeconds = (Long) tmpLong - (tmpMinutes * 60);
 					String strTime = tmpSeconds.toString();
@@ -1287,7 +1411,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 	}
 
-	// to force landscape ignore orienation change or keyboard change
+	// to force landscape ignore orientation change or keyboard change
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
 		// ignore orientation/keyboard change
@@ -1318,8 +1442,10 @@ public class AndroidTeaseMeActivity extends Activity {
 	private static final String FTYPE = ".xml";
 	private static final int DIALOG_LOAD_FILE = 1000;
 	private static final int DIALOG_PASSWORD_ENTER = 1001;
+	private static final int DIALOG_SHOW_PAGE = 1002;
 
 	private void loadFileList() {
+		File[] FileList;
 		try {
 			if (objPresFolder.exists()) {
 				FilenameFilter filter = new FilenameFilter() {
@@ -1329,8 +1455,23 @@ public class AndroidTeaseMeActivity extends Activity {
 						return filename.contains(FTYPE);
 					}
 				};
-				mFileList = objPresFolder.list(filter);
-				Arrays.sort(mFileList);
+				FileList = objPresFolder.listFiles(filter);
+				Arrays.sort(FileList, new Comparator<File>() {
+					public int compare(File f1, File f2) {
+						int intRetval;
+						if (strLoadSortOrder.equals("DATE")) {
+							intRetval = Long.valueOf(f2.lastModified()).compareTo(f1.lastModified());
+						} else if (strLoadSortOrder.equals("SIZE")){
+							intRetval = Long.valueOf(f2.length()).compareTo(f1.length());
+						} else {
+							intRetval = f1.getName().toUpperCase().compareTo(f2.getName().toUpperCase());
+						}
+						return intRetval;
+					}
+				});
+				mFileList = new String[FileList.length];
+				for (int i = 0; i < FileList.length; i++)
+					mFileList[i] = FileList[i].getName();
 			} else {
 				mFileList = new String[0];
 			}
@@ -1380,6 +1521,21 @@ public class AndroidTeaseMeActivity extends Activity {
 							// If the password is wrong exit the app
 							finish();
 						}
+					}
+				});
+				break;
+			case DIALOG_SHOW_PAGE:
+				dialog = new Dialog(this);
+				dialog.setCancelable(false);
+				dialog.setContentView(R.layout.pageentry);
+				dialog.setTitle("Enter Page");
+				Button objButtonPage = (Button) dialog.findViewById(R.id.btnPageOk);
+				objButtonPage.setOnClickListener(new OnClickListener() {
+					public void onClick(View v) {
+						EditText edit = (EditText) dialog.findViewById(R.id.editTextPage);
+						String text = edit.getText().toString();
+						dialog.dismiss();
+						displayPage(text);
 					}
 				});
 				break;

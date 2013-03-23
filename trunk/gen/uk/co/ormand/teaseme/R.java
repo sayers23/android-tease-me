@@ -8,32 +8,41 @@
 package uk.co.ormand.teaseme;
 
 public final class R {
+    public static final class array {
+        public static final int LoadSortName=0x7f060000;
+        public static final int LoadSortValue=0x7f060001;
+    }
     public static final class attr {
     }
     public static final class drawable {
-        public static final int btn_default_normal=0x7f020000;
-        public static final int ic_launcher=0x7f020001;
+        public static final int btn_black_glossy=0x7f020000;
+        public static final int btn_default_normal=0x7f020001;
+        public static final int btn_white_glossy=0x7f020002;
+        public static final int ic_launcher=0x7f020003;
     }
     public static final class id {
-        public static final int LayoutImage=0x7f070002;
-        public static final int LayoutRight=0x7f070003;
-        public static final int LayoutTextTop=0x7f070004;
-        public static final int LayoutTop=0x7f070001;
-        public static final int btnLayout=0x7f070009;
-        public static final int btnPasswordOk=0x7f07000b;
-        public static final int digitalClock1=0x7f070007;
-        public static final int editTextPassword=0x7f07000a;
-        public static final int settings_text_view=0x7f07000c;
-        public static final int textViewDebug=0x7f070006;
-        public static final int textViewTimer=0x7f070005;
-        public static final int webView1=0x7f070008;
-        public static final int webViewAbout=0x7f070000;
+        public static final int LayoutImage=0x7f080002;
+        public static final int LayoutRight=0x7f080003;
+        public static final int LayoutTextTop=0x7f080004;
+        public static final int LayoutTop=0x7f080001;
+        public static final int btnLayout=0x7f080009;
+        public static final int btnPageOk=0x7f08000b;
+        public static final int btnPasswordOk=0x7f08000d;
+        public static final int digitalClock1=0x7f080007;
+        public static final int editTextPage=0x7f08000a;
+        public static final int editTextPassword=0x7f08000c;
+        public static final int settings_text_view=0x7f08000e;
+        public static final int textViewDebug=0x7f080006;
+        public static final int textViewTimer=0x7f080005;
+        public static final int webView1=0x7f080008;
+        public static final int webViewAbout=0x7f080000;
     }
     public static final class layout {
         public static final int about=0x7f030000;
         public static final int main=0x7f030001;
-        public static final int passwordentry=0x7f030002;
-        public static final int show_settings_layout=0x7f030003;
+        public static final int pageentry=0x7f030002;
+        public static final int passwordentry=0x7f030003;
+        public static final int show_settings_layout=0x7f030004;
     }
     public static final class raw {
         public static final int android=0x7f050000;
@@ -41,13 +50,13 @@ public final class R {
         public static final int tick=0x7f050002;
     }
     public static final class string {
-        public static final int Image=0x7f060001;
-        public static final int OkButton=0x7f060003;
-        public static final int TagPage=0x7f060004;
-        public static final int TagSetFlags=0x7f060005;
-        public static final int TagUnSetFlags=0x7f060006;
-        public static final int app_name=0x7f060000;
-        public static final int timerSecret=0x7f060002;
+        public static final int Image=0x7f070001;
+        public static final int OkButton=0x7f070003;
+        public static final int TagPage=0x7f070004;
+        public static final int TagSetFlags=0x7f070005;
+        public static final int TagUnSetFlags=0x7f070006;
+        public static final int app_name=0x7f070000;
+        public static final int timerSecret=0x7f070002;
     }
     public static final class xml {
         public static final int preferences=0x7f040000;
