@@ -1,56 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/LayoutTop"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:keepScreenOn="true"
-    android:baselineAligned="false" >
+    android:baselineAligned="false"
+    android:keepScreenOn="true" xmlns:app="http://schemas.android.com/apk/res/uk.co.ormand.teaseme">
 
     <LinearLayout
         android:id="@+id/LayoutImage"
         android:layout_width="wrap_content"
-        android:layout_height="fill_parent">
-    </LinearLayout>
+        android:layout_height="fill_parent"
+        tools:ignore="Orientation" />
 
     <LinearLayout
         android:id="@+id/LayoutRight"
         android:layout_width="wrap_content"
         android:layout_height="fill_parent"
-        android:orientation="vertical"
-        android:layout_weight="1">
+        android:layout_weight="1"
+        android:orientation="vertical" >
 
         <LinearLayout
             android:id="@+id/LayoutTextTop"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:gravity="fill_horizontal">
+            android:gravity="fill_horizontal" >
 
             <TextView
                 android:id="@+id/textViewTimer"
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
-                android:text="@string/timerSecret"
                 android:layout_gravity="left"
+                android:layout_weight="2"
+                android:gravity="center_vertical|left"
+                android:text="@string/timerSecret"
                 android:textSize="12sp"
-                android:layout_weight="2" />
+                android:textStyle="normal"
+                android:typeface="normal"
+                android:shadowColor="#ff000000"
+                android:shadowDx="2"
+                android:shadowDy="2"
+                android:shadowRadius="1"
+                />
 
             <TextView
                 android:id="@+id/textViewDebug"
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
-                android:text=""
                 android:layout_gravity="center"
-                android:textSize="12sp"
-                android:layout_weight="1" />
+                android:layout_weight="1"
+                android:text=""
+                android:textSize="12sp" 
+                android:shadowColor="#ff000000"
+                android:shadowDx="2"
+                android:shadowDy="2"
+                android:shadowRadius="1"
+                />
 
             <DigitalClock
                 android:id="@+id/digitalClock1"
                 android:layout_width="wrap_content"
                 android:layout_height="fill_parent"
                 android:layout_gravity="right"
+                android:layout_weight="2"
                 android:gravity="right"
-                android:textSize="12sp"
-                android:layout_weight="2" />
+                android:textSize="12sp" 
+                android:shadowColor="#ff000000"
+                android:shadowDx="2"
+                android:shadowDy="2"
+                android:shadowRadius="1"
+                />
         </LinearLayout>
 
         <WebView
@@ -63,8 +82,7 @@
             android:id="@+id/btnLayout"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical" >
-        </LinearLayout>
+            android:orientation="vertical" />
     </LinearLayout>
 
 </LinearLayout>

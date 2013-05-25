@@ -28,10 +28,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
 import android.app.Dialog;
-//import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
@@ -45,16 +45,12 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-//import android.graphics.Matrix;
-//import android.graphics.PointF;
 import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.util.DisplayMetrics;
-//import android.util.FloatMath;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-//import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
@@ -166,6 +162,12 @@ public class AndroidTeaseMeActivity extends Activity {
 			}
 			//Image Full Screen default false
 			blnImageBackground = sharedPrefs.getBoolean("FullScreen", false);
+			if (!blnImageBackground) {
+				setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+			} else {
+				setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+			}
+			
 			//Load Sort Order
 			strLoadSortOrder = sharedPrefs.getString("SortOrder", "NAME");
 
@@ -178,7 +180,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
 			objClock.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objClock.setBackgroundColor(Color.parseColor("#7f000000"));
+				objClock.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objClock.setBackgroundColor(color.black);
 			}
@@ -188,7 +190,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
 			objDebug.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objDebug.setBackgroundColor(Color.parseColor("#7f000000"));
+				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objDebug.setBackgroundColor(color.black);
 			}
@@ -197,7 +199,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			objCountText = (TextView) findViewById(R.id.textViewTimer);
 			objCountText.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objCountText.setBackgroundColor(Color.parseColor("#7f000000"));
+				objCountText.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objCountText.setBackgroundColor(color.black);
 			}
@@ -272,6 +274,11 @@ public class AndroidTeaseMeActivity extends Activity {
 			strPresentationPath = sharedPrefs.getString("PrefDir", objSDRoot.getAbsolutePath() + "/Android/data/uk.co.ormand.teaseme/files/");
 			//Image Full Screen default false
 			blnImageBackground = sharedPrefs.getBoolean("FullScreen", false);
+			if (!blnImageBackground) {
+				setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+			} else {
+				setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+			}
 			strLoadSortOrder = sharedPrefs.getString("SortOrder", "NAME");
 
 
@@ -280,7 +287,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
 			objClock.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objClock.setBackgroundColor(Color.parseColor("#7f000000"));
+				objClock.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objClock.setBackgroundColor(color.black);
 			}
@@ -290,7 +297,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
 			objDebug.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objDebug.setBackgroundColor(Color.parseColor("#7f000000"));
+				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objDebug.setBackgroundColor(color.black);
 			}
@@ -298,7 +305,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			// Text control that contains the count down timer
 			objCountText.setTextSize(MintFontSize);
 			if (blnImageBackground) {
-				objCountText.setBackgroundColor(Color.parseColor("#7f000000"));
+				objCountText.setBackgroundColor(Color.parseColor("#00000000"));
 			} else {
 				objCountText.setBackgroundColor(color.black);
 			}
@@ -308,7 +315,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				if (strFlags != "") {
 					SetFlags(strFlags);
 				}
-				displayPage(strPage);
+				displayPage(strPage, false);
 			}
 			Log.d(TAG, "onResume End ");
 
@@ -318,7 +325,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			Log.e(TAG, "onResume Exception ", e);
 		}
 	}
-
+	
 	// onclick listener for dynamic buttons
 	View.OnClickListener getOnClickDoSomething(final Button button) {
 		return new View.OnClickListener() {
@@ -334,7 +341,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						UnsetFlags(strTag);
 					}
 					strTag = (String) button.getTag(R.string.TagPage);
-					displayPage(strTag);
+					displayPage(strTag, false);
 				} catch (Exception e) {
 					Log.e(TAG, "OnClick Exception ", e);
 				}
@@ -425,7 +432,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				objPrefEdit.putString("CurrentPage", "start");
 				objPrefEdit.putString("Flags", "");
 				objPrefEdit.commit();
-				displayPage("start");
+				displayPage("start", false);
 				return true;
 			case 3:
 				// Exit
@@ -445,12 +452,12 @@ public class AndroidTeaseMeActivity extends Activity {
 
 	}
 
-	public void displayPage(String pageName) {
+	public void displayPage(String pageName, Boolean reDisplay) {
 		// Main code that displays a page
 		String strId;
 		Element elPage;
 		Element elImage;
-		Element elDelay;
+		Element elDelay = null;
 		Element elButton;
 		Element elMetronome;
 		Element elAudio;
@@ -500,18 +507,20 @@ public class AndroidTeaseMeActivity extends Activity {
 		Log.d(TAG, "displayPage Flags " + GetFlags());
 
 		try {
-			if (tmrPageTimer != null) {
-				tmrPageTimer.cancel();
-			}
-			if (tmrTetronome != null) {
-				tmrTetronome.cancel();
-				tmrTetronome = null;
-			}
+			if(!reDisplay) {
+				if (tmrPageTimer != null) {
+					tmrPageTimer.cancel();
+				}
+				if (tmrTetronome != null) {
+					tmrTetronome.cancel();
+					tmrTetronome = null;
+				}
 
-			soundPool.stop(intSoundStream);
-			if (mMediaPlayer != null) {
-				mMediaPlayer.stop();
-				mMediaPlayer.reset();
+				soundPool.stop(intSoundStream);
+				if (mMediaPlayer != null) {
+					mMediaPlayer.stop();
+					mMediaPlayer.reset();
+				}
 			}
 
 			// handle random page
@@ -666,7 +675,7 @@ public class AndroidTeaseMeActivity extends Activity {
 								objVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
 									public void onCompletion(MediaPlayer mp) {
 										Log.d(TAG, "displayPage Video.setOnCompletionListener display " + strVidTarget);
-										displayPage(strVidTarget);
+										displayPage(strVidTarget, false);
 
 									}
 								});
@@ -820,7 +829,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						} else {
 							
 							strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: rgba(0,0,0,0); font-family: Tahoma; font-size:"
-									+ MintFontSize + "px } div {background-color: rgba(0,0,0,0.25); position: absolute; bottom: 0} </style></head><body><div>" + strTemp + "</div></body></html>";
+									+ MintFontSize + "px } div {background-color: rgba(0,0,0,0); position: absolute; bottom: 0; text-shadow: 2px 2px #000000} </style></head><body><div>" + strTemp + "</div></body></html>";
 							//objWebView1.loadData(strHTML, "text/html", null);
 							objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
 							objWebView1.setBackgroundColor(0);
@@ -840,81 +849,83 @@ public class AndroidTeaseMeActivity extends Activity {
 					tmpNodeList = elPage.getElementsByTagName("Delay");
 					elDelay = (Element) tmpNodeList.item(0);
 
-					try {
-						if (elDelay != null) {
-							Log.d(TAG, "displayPage Delay");
-							// test to see if we need this delay
-							blnTestSet = true;
-							blnTestNotSet = true;
-							strTest = elDelay.getAttribute("if-set");
-							if (!strTest.equals("")) {
-								blnTestSet = MatchesIfSetCondition(strTest);
-								Log.d(TAG, "displayPage Delay if-set" + strTest);
-							}
-							strTest = elDelay.getAttribute("if-not-set");
-							if (!strTest.equals("")) {
-								blnTestNotSet = MatchesIfNotSetCondition(strTest);
-								Log.d(TAG, "displayPage Delay if-not-set" + strTest);
-							}
+						try {
+							if (elDelay != null) {
+								Log.d(TAG, "displayPage Delay");
+								// test to see if we need this delay
+								blnTestSet = true;
+								blnTestNotSet = true;
+								strTest = elDelay.getAttribute("if-set");
+								if (!strTest.equals("")) {
+									blnTestSet = MatchesIfSetCondition(strTest);
+									Log.d(TAG, "displayPage Delay if-set" + strTest);
+								}
+								strTest = elDelay.getAttribute("if-not-set");
+								if (!strTest.equals("")) {
+									blnTestNotSet = MatchesIfNotSetCondition(strTest);
+									Log.d(TAG, "displayPage Delay if-not-set" + strTest);
+								}
 
-							if (blnTestSet && blnTestNotSet) {
-								strDelSeconds = elDelay.getAttribute("seconds");
-								strDelStyle = elDelay.getAttribute("style");
-								strDelTarget = elDelay.getAttribute("target");
-								strDelStartAt = elDelay.getAttribute("start-with");
-								try {
-									intDelStartAt = Integer.parseInt(strDelStartAt);
-								} catch (Exception etemp) {
-									intDelStartAt = 0;
-								}
-								// record any delay set / unset
-								strSet = elDelay.getAttribute("set");
-								if (!strSet.equals("")) {
-									strDelaySet = strSet;
-								}
-								strSet = elDelay.getAttribute("unset");
-								if (!strSet.equals("")) {
-									strDelayUnSet = strSet;
-								}
-								Log.d(TAG, "displayPage Delay Seconds " + strDelSeconds + " Style " + strDelStyle + " Target " + strDelTarget + " Set " + strDelaySet + " UnSet " + strDelayUnSet);
+								if (blnTestSet && blnTestNotSet) {
+									strDelSeconds = elDelay.getAttribute("seconds");
+									strDelStyle = elDelay.getAttribute("style");
+									strDelTarget = elDelay.getAttribute("target");
+									strDelStartAt = elDelay.getAttribute("start-with");
+									try {
+										intDelStartAt = Integer.parseInt(strDelStartAt);
+									} catch (Exception etemp) {
+										intDelStartAt = 0;
+									}
+									// record any delay set / unset
+									strSet = elDelay.getAttribute("set");
+									if (!strSet.equals("")) {
+										strDelaySet = strSet;
+									}
+									strSet = elDelay.getAttribute("unset");
+									if (!strSet.equals("")) {
+										strDelayUnSet = strSet;
+									}
+									Log.d(TAG, "displayPage Delay Seconds " + strDelSeconds + " Style " + strDelStyle + " Target " + strDelTarget + " Set " + strDelaySet + " UnSet " + strDelayUnSet);
 
-								// handle random Delay
-								intPos1 = strDelSeconds.indexOf("(");
-								intDelSeconds = 0;
-								if (intPos1 > -1) {
-									intPos2 = strDelSeconds.indexOf("..", intPos1);
-									if (intPos2 > -1) {
-										intPos3 = strDelSeconds.indexOf(")", intPos2);
-										if (intPos3 > -1) {
-											strMin = strDelSeconds.substring(intPos1 + 1, intPos2);
-											intMin = Integer.parseInt(strMin);
-											strMax = strDelSeconds.substring(intPos2 + 2, intPos3);
-											intMax = Integer.parseInt(strMax);
-											int i1 = mRandom.nextInt(intMax - intMin) + intMin;
-											intDelSeconds = i1;
-											Log.d(TAG, "displayPage Random Delay Min " + strMin + " Max " + strMax + " Chosen " + intDelSeconds);
+									// handle random Delay
+									intPos1 = strDelSeconds.indexOf("(");
+									intDelSeconds = 0;
+									if (intPos1 > -1) {
+										intPos2 = strDelSeconds.indexOf("..", intPos1);
+										if (intPos2 > -1) {
+											intPos3 = strDelSeconds.indexOf(")", intPos2);
+											if (intPos3 > -1) {
+												strMin = strDelSeconds.substring(intPos1 + 1, intPos2);
+												intMin = Integer.parseInt(strMin);
+												strMax = strDelSeconds.substring(intPos2 + 2, intPos3);
+												intMax = Integer.parseInt(strMax);
+												int i1 = mRandom.nextInt(intMax - intMin) + intMin;
+												intDelSeconds = i1;
+												Log.d(TAG, "displayPage Random Delay Min " + strMin + " Max " + strMax + " Chosen " + intDelSeconds);
+											}
+										}
+									} else {
+										intDelSeconds = Integer.parseInt(strDelSeconds);
+									}
+									if (!reDisplay) {
+										if (intDelSeconds == 0) { 
+											tmrPageTimer = new PageTimer(250, 0, 250);
+											tmrPageTimer.start();
+										} else {
+											intDelSeconds = intDelSeconds * 1000;
+											tmrPageTimer = new PageTimer(intDelSeconds, intDelStartAt, 1000);
+											tmrPageTimer.start();
 										}
 									}
-								} else {
-									intDelSeconds = Integer.parseInt(strDelSeconds);
 								}
-								if (intDelSeconds == 0) { 
-									tmrPageTimer = new PageTimer(250, 0, 250);
-									tmrPageTimer.start();
-								} else {
-									intDelSeconds = intDelSeconds * 1000;
-									tmrPageTimer = new PageTimer(intDelSeconds, intDelStartAt, 1000);
-									tmrPageTimer.start();
-								}
+							} else {
+								objCountText.setText("");
 							}
-						} else {
+						} catch (Exception e1) {
+							Log.e(TAG, "displayPage Delay Exception " + e1.getLocalizedMessage());
 							objCountText.setText("");
 						}
-					} catch (Exception e1) {
-						Log.e(TAG, "displayPage Delay Exception " + e1.getLocalizedMessage());
-						objCountText.setText("");
-					}
-
+					
 					// buttons
 					// remove old buttons
 					LinearLayout btnLayout = (LinearLayout) findViewById(R.id.btnLayout);
@@ -927,7 +938,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					btnLayout.addView(btnLayoutRow);
 					layout = btnLayoutRow.getLayoutParams();
 					layout.height = LayoutParams.WRAP_CONTENT;
-					layout.width = LayoutParams.FILL_PARENT;
+					layout.width = LayoutParams.WRAP_CONTENT;
 					btnLayoutRow.setLayoutParams(layout);
 					btnLayoutRow.setWeightSum(intBtnLetters);
 					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
@@ -980,7 +991,7 @@ public class AndroidTeaseMeActivity extends Activity {
 										btnLayoutRow = new LinearLayout(this);
 										layout = btnLayoutRow.getLayoutParams();
 										layout.height = LayoutParams.WRAP_CONTENT;
-										layout.width = LayoutParams.FILL_PARENT;
+										layout.width = LayoutParams.WRAP_CONTENT;
 										btnLayoutRow.setLayoutParams(layout);
 										btnLayoutRow.setWeightSum(intBtnLetters);
 										btnLayout.addView(btnLayoutRow);
@@ -1037,7 +1048,7 @@ public class AndroidTeaseMeActivity extends Activity {
 									btnLayoutRow = new LinearLayout(this);
 									layout = btnLayoutRow.getLayoutParams();
 									layout.height = LayoutParams.WRAP_CONTENT;
-									layout.width = LayoutParams.FILL_PARENT;
+									layout.width = LayoutParams.WRAP_CONTENT;
 									btnLayoutRow.setLayoutParams(layout);
 									btnLayoutRow.setWeightSum(intBtnLetters);
 									btnLayout.addView(btnLayoutRow);
@@ -1072,85 +1083,87 @@ public class AndroidTeaseMeActivity extends Activity {
 						Log.e(TAG, "displayPage Debug Exception " + e1.getLocalizedMessage());
 					}
 
-					// Audio / Metronome
-					tmpNodeList = elPage.getElementsByTagName("Metronome");
-					elMetronome = (Element) tmpNodeList.item(0);
-					if (elMetronome != null) {
-						// Metronome
-						String strbpm = elMetronome.getAttribute("bpm");
-						int intbpm = Integer.parseInt(strbpm);
-						Log.d(TAG, "displayPage Metronome " + intbpm + " BPM");
-						intbpm = 60000 / intbpm;
-						try {
-							tmrTetronome = new Timer();
-							tmrTetronome.schedule(new MetronomeTask(), intbpm, intbpm);
-						} catch (IllegalArgumentException e) {
-							Log.e(TAG, "displayPage IllegalArgumentException ", e);
-						} catch (IllegalStateException e) {
-							Log.e(TAG, "displayPage IllegalStateException ", e);
-						} catch (Exception e) {
-							Log.e(TAG, "displayPage Exception ", e);
-						}
-					} else {
-						// Audio
-						tmpNodeList = elPage.getElementsByTagName("Audio");
-						elAudio = (Element) tmpNodeList.item(0);
-						if (elAudio != null) {
+					if (!reDisplay) {
+						// Audio / Metronome
+						tmpNodeList = elPage.getElementsByTagName("Metronome");
+						elMetronome = (Element) tmpNodeList.item(0);
+						if (elMetronome != null) {
+							// Metronome
+							String strbpm = elMetronome.getAttribute("bpm");
+							int intbpm = Integer.parseInt(strbpm);
+							Log.d(TAG, "displayPage Metronome " + intbpm + " BPM");
+							intbpm = 60000 / intbpm;
 							try {
-								String strIntAudio = elAudio.getAttribute("repeat");
-								if (strIntAudio.equals("")) {
-									intAudioLoops = 0;
-								} else {
-									intAudioLoops = Integer.parseInt(strIntAudio);
-								}
-								strAudio = elAudio.getAttribute("id");
-								Log.d(TAG, "displayPage Audio " + strAudio);
-								strAudioTarget = elImage.getAttribute("target");
-								Log.d(TAG, "displayPage Audio target " + strAudioTarget);
-								// run audio on another thread
-								new Thread(new Runnable() {
-									public void run() {
-										mMediaPlayer = new MediaPlayer();
-										try {
-											mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
-											mMediaPlayer.prepare();
-											// if we have a target or a number of loops do some additional processing
-											if (!strAudioTarget.equals("") || intAudioLoops > 0) {
-												Log.d(TAG, "displayPage Audio.setOnCompletionListener set target " + strAudioTarget + " loops " + intAudioLoops);
-												//set a listener for the end of the audio
-												mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-													public void onCompletion(MediaPlayer mp) {
-														//if we still need to loop play it again
-														if (intAudioLoops > 0) {
-															Log.d(TAG, "displayPage Audio.setOnCompletionListener Loop " + intAudioLoops);
-															intAudioLoops = intAudioLoops - 1;
-															//restart the audio
-															mMediaPlayer.stop();
-															mMediaPlayer.start();
-														} else {
-															//if we don't need to loop and we have a target display the target page
-															if (!strAudioTarget.equals("")) {
-																Log.d(TAG, "displayPage Audio.setOnCompletionListener display " + strAudioTarget);
-																displayPage(strAudioTarget);
+								tmrTetronome = new Timer();
+								tmrTetronome.schedule(new MetronomeTask(), intbpm, intbpm);
+							} catch (IllegalArgumentException e) {
+								Log.e(TAG, "displayPage IllegalArgumentException ", e);
+							} catch (IllegalStateException e) {
+								Log.e(TAG, "displayPage IllegalStateException ", e);
+							} catch (Exception e) {
+								Log.e(TAG, "displayPage Exception ", e);
+							}
+						} else {
+							// Audio
+							tmpNodeList = elPage.getElementsByTagName("Audio");
+							elAudio = (Element) tmpNodeList.item(0);
+							if (elAudio != null) {
+								try {
+									String strIntAudio = elAudio.getAttribute("repeat");
+									if (strIntAudio.equals("")) {
+										intAudioLoops = 0;
+									} else {
+										intAudioLoops = Integer.parseInt(strIntAudio);
+									}
+									strAudio = elAudio.getAttribute("id");
+									Log.d(TAG, "displayPage Audio " + strAudio);
+									strAudioTarget = elImage.getAttribute("target");
+									Log.d(TAG, "displayPage Audio target " + strAudioTarget);
+									// run audio on another thread
+									new Thread(new Runnable() {
+										public void run() {
+											mMediaPlayer = new MediaPlayer();
+											try {
+												mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
+												mMediaPlayer.prepare();
+												// if we have a target or a number of loops do some additional processing
+												if (!strAudioTarget.equals("") || intAudioLoops > 0) {
+													Log.d(TAG, "displayPage Audio.setOnCompletionListener set target " + strAudioTarget + " loops " + intAudioLoops);
+													//set a listener for the end of the audio
+													mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+														public void onCompletion(MediaPlayer mp) {
+															//if we still need to loop play it again
+															if (intAudioLoops > 0) {
+																Log.d(TAG, "displayPage Audio.setOnCompletionListener Loop " + intAudioLoops);
+																intAudioLoops = intAudioLoops - 1;
+																//restart the audio
+																mMediaPlayer.stop();
+																mMediaPlayer.start();
+															} else {
+																//if we don't need to loop and we have a target display the target page
+																if (!strAudioTarget.equals("")) {
+																	Log.d(TAG, "displayPage Audio.setOnCompletionListener display " + strAudioTarget);
+																	displayPage(strAudioTarget, false);
+																}
 															}
 														}
-													}
-												});
+													});
+												}
+											} catch (IllegalArgumentException e) {
+												Log.e(TAG, "displayPage IllegalArgumentException ", e);
+											} catch (IllegalStateException e) {
+												Log.e(TAG, "displayPage IllegalStateException ", e);
+											} catch (IOException e) {
+												Log.e(TAG, "displayPage IOException ", e);
 											}
-										} catch (IllegalArgumentException e) {
-											Log.e(TAG, "displayPage IllegalArgumentException ", e);
-										} catch (IllegalStateException e) {
-											Log.e(TAG, "displayPage IllegalStateException ", e);
-										} catch (IOException e) {
-											Log.e(TAG, "displayPage IOException ", e);
+											Log.d(TAG, "displayPage Audio Start");
+											//start the audio
+											mMediaPlayer.start();
 										}
-										Log.d(TAG, "displayPage Audio Start");
-										//start the audio
-										mMediaPlayer.start();
-									}
-								}).start();
-							} catch (Exception e1) {
-								Log.e(TAG, "displayPage Audio Exception " + e1.getLocalizedMessage());
+									}).start();
+								} catch (Exception e1) {
+									Log.e(TAG, "displayPage Audio Exception " + e1.getLocalizedMessage());
+								}
 							}
 						}
 					}
@@ -1375,7 +1388,7 @@ public class AndroidTeaseMeActivity extends Activity {
 					UnsetFlags(strDelayUnSet);
 				}
 				Log.d(TAG, "PageTimer  onFinish Target " + strDelTarget);
-				displayPage(strDelTarget);
+				displayPage(strDelTarget, false);
 			} catch (Exception e) {
 				Log.e(TAG, "onFinish Exception ", e);
 			}
@@ -1411,11 +1424,23 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 	}
 
-	// to force landscape ignore orientation change or keyboard change
+	// orientation change or keyboard change
 	@Override
 	public void onConfigurationChanged(Configuration newConfig) {
 		// ignore orientation/keyboard change
 		super.onConfigurationChanged(newConfig);
+		// Get the size of the screen in pixels
+		DisplayMetrics dm = new DisplayMetrics();
+		getWindowManager().getDefaultDisplay().getMetrics(dm);
+
+		intHeightTop = dm.heightPixels;
+		intWidthTop = dm.widthPixels;
+
+		if (objLocalVarianbles!=null){
+			String strPage = objLocalVarianbles.getString("CurrentPage", "start");
+			displayPage(strPage, true);
+		}
+
 	}
 
 	private int intSoundStream;
@@ -1500,7 +1525,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						String strPage;
 						mChosenFile = mFileList[which];
 						strPage = loadXML(mChosenFile);
-						displayPage(strPage);
+						displayPage(strPage, false);
 					}
 				});
 				dialog = builder.show();
@@ -1535,7 +1560,7 @@ public class AndroidTeaseMeActivity extends Activity {
 						EditText edit = (EditText) dialog.findViewById(R.id.editTextPage);
 						String text = edit.getText().toString();
 						dialog.dismiss();
-						displayPage(text);
+						displayPage(text, false);
 					}
 				});
 				break;
@@ -1621,17 +1646,18 @@ public class AndroidTeaseMeActivity extends Activity {
 				fltRatio = (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
 				fltScrnRatio = (float) reqHeight / (float) reqWidth;
 				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio);
-				if (fltRatio > 1) {
+				/*if (fltScrnRatio > fltRatio) {
 					// portrait
 					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
 				} else {
+				*/
 					// landscape
 					if (fltScrnRatio > fltRatio) {
 						objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), false);
 					} else {
 						objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
 					}
-				}
+				//}
 				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio + " BitMap Height " + objBitMap.getHeight() + " width " + objBitMap.getWidth());
 			} catch (Exception e) {
 				Log.e(TAG, "calculateInSampleSize Exception ", e);
@@ -1830,5 +1856,5 @@ public class AndroidTeaseMeActivity extends Activity {
 		Log.d(TAG, "AllowedToShowPage returned " + blnCanShow);
 		return blnCanShow;
 	}
-
+	
 }
