@@ -45,4 +45,23 @@
         android:summary="Sort order when loading teases"
         android:title="Sort Order" />
 
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:key="Title"
+        android:summaryOff="No title"
+        android:summaryOn="Display title"
+        android:title="Title" />
+    <CheckBoxPreference
+        android:defaultValue="true"
+        android:key="Clock"
+        android:summaryOff="No Clock"
+        android:summaryOn="Displays clock"
+        android:title="Display Clock" />
+
+    <EditTextPreference
+        android:defaultValue="0"
+        android:key="BtnTran"
+        android:summary="0 to 255 (255 Normal buttons 0 transparent 254-1 semi transparent)"
+        android:title="Button Transparency" />
+
 </PreferenceScreen>
