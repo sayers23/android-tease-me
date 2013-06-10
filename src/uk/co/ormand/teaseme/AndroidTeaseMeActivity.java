@@ -111,6 +111,9 @@ public class AndroidTeaseMeActivity extends Activity {
 	private String strAudio;
 	private String strAudioTarget;
 	private String strLoadSortOrder;
+	private Boolean blnTitle = true;
+	private Boolean blnClock = true;
+	private int intTransparency = 255;
 
 	// TODO about
 	// TODO vote
@@ -146,6 +149,16 @@ public class AndroidTeaseMeActivity extends Activity {
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			// debug flag
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
+
+			// Title flag
+			blnTitle = sharedPrefs.getBoolean("Title", true);
+
+			// Clock flag
+			blnClock = sharedPrefs.getBoolean("Clock", true);
+
+			// transparency
+			intTransparency = Integer.parseInt(sharedPrefs.getString("BtnTran", "0"));
+
 			// font size
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
 			// number of letters for buttons per row
@@ -178,21 +191,34 @@ public class AndroidTeaseMeActivity extends Activity {
 
 			// Clock control that displays the current time
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
-			objClock.setTextSize(MintFontSize);
-			if (blnImageBackground) {
-				objClock.setBackgroundColor(Color.parseColor("#00000000"));
+			if (blnClock) {
+				objClock.setTextSize(MintFontSize);
+				objClock.setTextColor(Color.WHITE);
+				if (blnImageBackground) {
+					objClock.setBackgroundColor(Color.parseColor("#00000000"));
+				} else {
+					objClock.setBackgroundColor(color.black);
+				}
 			} else {
-				objClock.setBackgroundColor(color.black);
+				objClock.setBackgroundColor(Color.parseColor("#00000000"));
+				objClock.setTextColor(Color.parseColor("#00000000"));
 			}
 
 			// Text control that contains page name in debug mode or description
 			// if not
 			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
-			objDebug.setTextSize(MintFontSize);
-			if (blnImageBackground) {
-				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+			if (blnTitle) {
+				objDebug.setTextSize(MintFontSize);
+				objDebug.setTextColor(Color.WHITE);
+				if (blnImageBackground) {
+					objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+				} else {
+					objDebug.setBackgroundColor(color.black);
+				}
 			} else {
-				objDebug.setBackgroundColor(color.black);
+				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+				objDebug.setTextColor(Color.parseColor("#00000000"));
+
 			}
 
 			// Text control that contains the count down timer
@@ -268,6 +294,9 @@ public class AndroidTeaseMeActivity extends Activity {
 			Flags = new ArrayList<String>();
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
+			blnTitle = sharedPrefs.getBoolean("Title", true);
+			blnClock = sharedPrefs.getBoolean("Clock", true);
+			intTransparency = Integer.parseInt(sharedPrefs.getString("BtnTran", "0"));
 			MintFontSize = Integer.parseInt(sharedPrefs.getString("FontSize", "10"));
 			intBtnLetters = Integer.parseInt(sharedPrefs.getString("BtnLetters", "35"));
 			objSDRoot = Environment.getExternalStorageDirectory();
@@ -285,21 +314,34 @@ public class AndroidTeaseMeActivity extends Activity {
 
 			// Clock control that displays the current time
 			DigitalClock objClock = (DigitalClock) findViewById(R.id.digitalClock1);
-			objClock.setTextSize(MintFontSize);
-			if (blnImageBackground) {
-				objClock.setBackgroundColor(Color.parseColor("#00000000"));
+			if (blnClock) {
+				objClock.setTextSize(MintFontSize);
+				objClock.setTextColor(Color.WHITE);
+				if (blnImageBackground) {
+					objClock.setBackgroundColor(Color.parseColor("#00000000"));
+				} else {
+					objClock.setBackgroundColor(color.black);
+				}
 			} else {
-				objClock.setBackgroundColor(color.black);
+				objClock.setBackgroundColor(Color.parseColor("#00000000"));
+				objClock.setTextColor(Color.parseColor("#00000000"));
 			}
 
 			// Text control that contains page name in debug mode or description
 			// if not
 			TextView objDebug = (TextView) findViewById(R.id.textViewDebug);
-			objDebug.setTextSize(MintFontSize);
-			if (blnImageBackground) {
-				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+			if (blnTitle) {
+				objDebug.setTextSize(MintFontSize);
+				objDebug.setTextColor(Color.WHITE);
+				if (blnImageBackground) {
+					objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+				} else {
+					objDebug.setBackgroundColor(color.black);
+				}
 			} else {
-				objDebug.setBackgroundColor(color.black);
+				objDebug.setBackgroundColor(Color.parseColor("#00000000"));
+				objDebug.setTextColor(Color.parseColor("#00000000"));
+
 			}
 
 			// Text control that contains the count down timer
@@ -475,7 +517,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		int intMax;
 		int intDpLeft;
 		int intBtnLen;
-		// *int intRows;
+		int intRows;
 		String strMin;
 		String strMax;
 		String strPre;
@@ -494,6 +536,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		NodeList pageNodeList;
 		NodeList tmpNodeList;
 		LinearLayout btnLayoutRow = null;
+		LinearLayout btnLayoutRow2 = null;
 		LinearLayout.LayoutParams btnLayoutParm;
 		ViewGroup.LayoutParams layout;
 		ImageView objImageView;
@@ -935,6 +978,8 @@ public class AndroidTeaseMeActivity extends Activity {
 					tmpNodeList = elPage.getElementsByTagName("Button");
 					intDpLeft = intBtnLetters;
 					btnLayoutRow = new LinearLayout(this);
+					btnLayoutRow.setOrientation(LinearLayout.HORIZONTAL);
+					intRows = 1;
 					btnLayout.addView(btnLayoutRow);
 					layout = btnLayoutRow.getLayoutParams();
 					layout.height = LayoutParams.WRAP_CONTENT;
@@ -982,19 +1027,26 @@ public class AndroidTeaseMeActivity extends Activity {
 									Button btnDynamic = new Button(this);
 									btnDynamic.setText(strBtnText);
 									btnDynamic.setTextSize(MintFontSize);
-									//btnDynamic.setShadowLayer(2, 1, 1, 0xffffff);
-									btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_black_glossy));
+									btnDynamic.setShadowLayer(9, 1, 1, Color.rgb(44,44,44));
 									btnDynamic.setTextColor(Color.WHITE);
+									if (intTransparency == 255) {
+										btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_black_glossy));
+									} else {
+										btnDynamic.getBackground().setAlpha(intTransparency);
+									}
+									
 
 									if (intDpLeft < intBtnLen) {
+										intRows = 2;
 										intDpLeft = intBtnLetters;
-										btnLayoutRow = new LinearLayout(this);
+										btnLayoutRow2 = new LinearLayout(this);
+										btnLayoutRow2.setOrientation(LinearLayout.HORIZONTAL);
 										layout = btnLayoutRow.getLayoutParams();
 										layout.height = LayoutParams.WRAP_CONTENT;
 										layout.width = LayoutParams.WRAP_CONTENT;
-										btnLayoutRow.setLayoutParams(layout);
-										btnLayoutRow.setWeightSum(intBtnLetters);
-										btnLayout.addView(btnLayoutRow);
+										btnLayoutRow2.setLayoutParams(layout);
+										btnLayoutRow2.setWeightSum(intBtnLetters);
+										btnLayout.addView(btnLayoutRow2);
 									}
 									intDpLeft = intDpLeft - intBtnLen;
 
@@ -1018,7 +1070,11 @@ public class AndroidTeaseMeActivity extends Activity {
 
 									btnDynamic.setTag(R.string.TagPage, strBtnTarget);
 									btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
-									btnLayoutRow.addView(btnDynamic);
+									if (intRows == 1) {
+										btnLayoutRow.addView(btnDynamic);
+									} else {
+										btnLayoutRow2.addView(btnDynamic);
+									}
 									btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
 									btnLayoutParm.width = 0;
 									btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
@@ -1653,9 +1709,9 @@ public class AndroidTeaseMeActivity extends Activity {
 				*/
 					// landscape
 					if (fltScrnRatio > fltRatio) {
-						objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), false);
+						objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), true);
 					} else {
-						objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
+						objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, true);
 					}
 				//}
 				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio + " BitMap Height " + objBitMap.getHeight() + " width " + objBitMap.getWidth());
