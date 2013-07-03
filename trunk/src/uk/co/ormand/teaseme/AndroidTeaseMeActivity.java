@@ -1,26 +1,20 @@
 package uk.co.ormand.teaseme;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
+import org.xmlpull.v1.XmlPullParser;
+import org.xmlpull.v1.XmlPullParserFactory;
 
 import android.R.color;
 import android.annotation.SuppressLint;
@@ -71,11 +65,7 @@ public class AndroidTeaseMeActivity extends Activity {
 	private File objSDRoot;
 	private File objPresFolder;
 	private String strPresentationPath;
-	private DocumentBuilderFactory objDocumentBuilderFactory;
-	private DocumentBuilder objDocumentBuilder;
 	private String strMediaDirectory;
-	private Document objDocPresXML;
-	private Element objPagesElement;
 	private PageTimer tmrPageTimer;
 	private Timer tmrTetronome;
 	private WebView objWebView1;
@@ -95,7 +85,7 @@ public class AndroidTeaseMeActivity extends Activity {
 	private String strFilePatern;
 	private String strPasswordEntered;
 	private String strPrefPassword;
-	private List<String> Flags;
+	private ArrayList<String> Flags = new ArrayList<String>();
 	private Boolean blnAutoSetPage;
 	private Boolean blnImageBackground = true;
 	private String strDelaySet;
@@ -114,6 +104,9 @@ public class AndroidTeaseMeActivity extends Activity {
 	private Boolean blnTitle = true;
 	private Boolean blnClock = true;
 	private int intTransparency = 255;
+	private comonFunctions comFun = new comonFunctions(TAG);
+	private HashMap<String, page> Ipages = new HashMap<String, page>(); 
+	private VideoView objVideoView;
 
 	// TODO about
 	// TODO vote
@@ -256,7 +249,7 @@ public class AndroidTeaseMeActivity extends Activity {
 			}
 
 			// array to hold the various flags
-			Flags = new ArrayList<String>();
+			Flags.clear();
 		} catch (NumberFormatException e) {
 			Log.e(TAG, "OnCreate NumberFormatException ", e);
 		} catch (Exception e) {
@@ -270,8 +263,18 @@ public class AndroidTeaseMeActivity extends Activity {
 		// If we go out of the app then stop any video / sounds that are
 		// currently playing
 		if (mMediaPlayer != null) {
-			mMediaPlayer.stop();
-			mMediaPlayer.reset();
+			if (mMediaPlayer.isPlaying()) {
+				mMediaPlayer.stop();
+				mMediaPlayer.reset();
+			}
+		}
+
+		if (tmrTetronome != null) {
+			tmrTetronome.cancel();
+			tmrTetronome = null;
+		}
+		if (soundPool != null) {
+			soundPool.stop(intSoundStream);
 		}
 	}
 
@@ -291,7 +294,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		super.onResume();
 		try {
 			Log.d(TAG, "onResume Start ");
-			Flags = new ArrayList<String>();
+			Flags.clear();
 			SharedPreferences sharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 			blnDebug = sharedPrefs.getBoolean("Debug", false);
 			blnTitle = sharedPrefs.getBoolean("Title", true);
@@ -351,11 +354,12 @@ public class AndroidTeaseMeActivity extends Activity {
 			} else {
 				objCountText.setBackgroundColor(color.black);
 			}
+			
 			if (objLocalVarianbles!=null){
 				String strPage = objLocalVarianbles.getString("CurrentPage", "start");
 				String strFlags = objLocalVarianbles.getString("Flags", "");
 				if (strFlags != "") {
-					SetFlags(strFlags);
+					comFun.SetFlags(strFlags, Flags);
 				}
 				displayPage(strPage, false);
 			}
@@ -376,11 +380,11 @@ public class AndroidTeaseMeActivity extends Activity {
 					String strTag;
 					strTag = (String) button.getTag(R.string.TagSetFlags);
 					if (!strTag.equals("")) {
-						SetFlags(strTag);
+						comFun.SetFlags(strTag, Flags);
 					}
 					strTag = (String) button.getTag(R.string.TagUnSetFlags);
 					if (!strTag.equals("")) {
-						UnsetFlags(strTag);
+						comFun.UnsetFlags(strTag, Flags);
 					}
 					strTag = (String) button.getTag(R.string.TagPage);
 					displayPage(strTag, false);
@@ -468,7 +472,7 @@ public class AndroidTeaseMeActivity extends Activity {
 				return true;
 			case 2:
 				//Restart
-				Flags = new ArrayList<String>();
+				Flags.clear();
 				SharedPreferences.Editor objPrefEdit;
 				objPrefEdit = objLocalVarianbles.edit();
 				objPrefEdit.putString("CurrentPage", "start");
@@ -496,20 +500,11 @@ public class AndroidTeaseMeActivity extends Activity {
 
 	public void displayPage(String pageName, Boolean reDisplay) {
 		// Main code that displays a page
-		String strId;
-		Element elPage;
-		Element elImage;
-		Element elDelay = null;
-		Element elButton;
-		Element elMetronome;
-		Element elAudio;
-		Node elText;
 		String strImage;
 		String strHTML;
-		String strDelSeconds;
 		String strBtnTarget;
 		String strBtnText;
-		int intDelSeconds;
+		int intDelSeconds = 0;
 		int intPos1;
 		int intPos2;
 		int intPos3;
@@ -523,31 +518,32 @@ public class AndroidTeaseMeActivity extends Activity {
 		String strPre;
 		String strPost;
 		String strPageName;
-		String strSet;
-		String strTest;
 		String strStartAt;
 		String strStopAt;
 		String strDelStartAt;
 		int intDelStartAt;
 		int intStartAt;
 		int intStopAt;
-		boolean blnTestSet;
-		boolean blnTestNotSet;
-		NodeList pageNodeList;
-		NodeList tmpNodeList;
+		boolean blnVideo;
+		boolean blnDelay;
+		boolean blnMetronome;
 		LinearLayout btnLayoutRow = null;
 		LinearLayout btnLayoutRow2 = null;
 		LinearLayout.LayoutParams btnLayoutParm;
 		ViewGroup.LayoutParams layout;
 		ImageView objImageView;
-		final VideoView objVideoView;
 		String imgPath = null;
 		String strFlags;
-		String strHour;
-		String strMinute;
-		String strSecond;
+		page objCurrPage;
+		delay objDelay;
+		audio objAudio;
+		video objVideo;
+		image objImage;
+		button objButton;
+		metronome objMetronome;
+		
 		Log.d(TAG, "displayPage PagePassed " + pageName);
-		Log.d(TAG, "displayPage Flags " + GetFlags());
+		Log.d(TAG, "displayPage Flags " + comFun.GetFlags(Flags));
 
 		try {
 			if(!reDisplay) {
@@ -558,11 +554,19 @@ public class AndroidTeaseMeActivity extends Activity {
 					tmrTetronome.cancel();
 					tmrTetronome = null;
 				}
+				if (soundPool != null) {
+					soundPool.stop(intSoundStream);
+				}
 
-				soundPool.stop(intSoundStream);
 				if (mMediaPlayer != null) {
-					mMediaPlayer.stop();
-					mMediaPlayer.reset();
+					if (mMediaPlayer.isPlaying()) {
+						mMediaPlayer.stop();
+						mMediaPlayer.reset();
+					}
+				}
+				
+				if (objVideoView != null) {
+					objVideoView.stopPlayback();
 				}
 			}
 
@@ -590,13 +594,19 @@ public class AndroidTeaseMeActivity extends Activity {
 						String[] strPageArray;
 						strPageArray = new String[intMax];
 						int intPageArrayCount = -1;
+						page tmpPage;
 						// Check if we are allowed to display the pages
 						for (int i = intMin; i <= intMax; i++) {
 							strPageName = strPre + i + strPost;
-							if (AllowedToShowPage(strPageName)) {
-								Log.d(TAG, "displayPage PageAllowed " + strPageName + " Yes");
-								intPageArrayCount++;
-								strPageArray[intPageArrayCount] = strPageName;
+							if (Ipages.containsKey(strPageName)) {
+								tmpPage = Ipages.get(strPageName);
+								if (tmpPage.canShow(Flags)) {
+									Log.d(TAG, "displayPage PageAllowed " + strPageName + " Yes");
+									intPageArrayCount++;
+									strPageArray[intPageArrayCount] = strPageName;
+								} else {
+									Log.d(TAG, "displayPage PageAllowed " + strPageName + " No");
+								}
 							} else {
 								Log.d(TAG, "displayPage PageAllowed " + strPageName + " No");
 							}
@@ -613,626 +623,577 @@ public class AndroidTeaseMeActivity extends Activity {
 				}
 			}
 
-			// set page
-			if (blnAutoSetPage) {
-				Flags.add(strPageName);
+			// display page
+			objCurrPage = Ipages.get(strPageName);
+			
+			// delay
+			objCountText.setText("");
+			blnDelay = false;
+			intDelSeconds = 1;
+			if (objCurrPage.getDelayCount() > 0) {
+				try {
+					for (int i2 = 0; i2 < objCurrPage.getDelayCount(); i2++) {
+						objDelay = objCurrPage.getDelay(i2);
+						if (objDelay.canShow(Flags)) {
+							blnDelay = true;
+							Log.d(TAG, "displayPage Delay");
+							strDelStyle = objDelay.getstyle();
+							strDelTarget = objDelay.getTarget();
+							strDelStartAt = objDelay.getStartWith();
+							intDelSeconds = objDelay.getDelaySec();
+							try {
+								intDelStartAt = Integer.parseInt(strDelStartAt);
+							} catch (Exception etemp) {
+								intDelStartAt = 0;
+							}
+
+							// record any delay set / unset
+                            strDelaySet = objDelay.getSet();
+                            strDelayUnSet =  objDelay.getUnSet();
+                            Log.d(TAG, "displayPage Delay Seconds " + intDelSeconds + " Style " + strDelStyle + " Target " + strDelTarget + " Set " + strDelaySet + " UnSet " + strDelayUnSet);
+
+							if (!reDisplay) {
+								if (intDelSeconds == 0) { 
+									tmrPageTimer = new PageTimer(10, 0, 10);
+									tmrPageTimer.start();
+								} else {
+									intDelSeconds = intDelSeconds * 1000;
+									tmrPageTimer = new PageTimer(intDelSeconds, intDelStartAt, 1000);
+									tmrPageTimer.start();
+								}
+							}
+							break;
+						} else {
+							objCountText.setText("");
+						}
+					}
+				} catch (Exception e1) {
+					Log.e(TAG, "displayPage Delay Exception " + e1.getLocalizedMessage());
+					objCountText.setText("");
+				}
 			}
 
-			// display page
-			pageNodeList = objPagesElement.getElementsByTagName("Page");
-			// loop through till we find the page
-			for (int i = 0; i < pageNodeList.getLength(); i++) {
-				elPage = (Element) pageNodeList.item(i);
-				strId = elPage.getAttribute("id");
-				if (strId.equals(strPageName)) {
-					// found the page so display it
 
-					// do page set / unset
-					try {
-						strSet = elPage.getAttribute("set");
-						if (!strSet.equals("")) {
-							SetFlags(strSet);
-							Log.d(TAG, "displayPage PageSet " + strSet);
+			if (!(intDelSeconds == 0)) { 
+				// Video
+				blnVideo = false;
+				if (objCurrPage.getVideoCount() > 0) {
+					for (int i2 = 0; i2 < objCurrPage.getVideoCount(); i2++) {
+						objVideo = objCurrPage.getVideo(i2);
+						if (objVideo.canShow(Flags)) {
+							blnVideo = true;
+							objLayoutTop.setBackgroundDrawable(null);
+							strImage = objVideo.getIid();
+							Log.d(TAG, "displayPage Video " + strImage);
+							strStartAt = objVideo.getIstartAt();
+							Log.d(TAG, "displayPage Video Start At " + strStartAt);
+							intStartAt = 0;
+							try {
+								if (strStartAt != "") {
+									intStartAt = comFun.getMilisecFromTime(strStartAt);
+								}
+							} catch (Exception e1) {
+								intStartAt = 0;
+								Log.e(TAG, "displayPage startat Exception " + e1.getLocalizedMessage());
+							}
+
+							strStopAt = objVideo.getIstopAt();
+							Log.d(TAG, "displayPage Video Stop At " + strStopAt);
+							intStopAt = 0;
+							try {
+								if (strStopAt != "") {
+									intStopAt = comFun.getMilisecFromTime(strStopAt);
+								}
+							} catch (Exception e1) {
+								intStopAt = 0;
+								Log.e(TAG, "displayPage stopat Exception " + e1.getLocalizedMessage());
+							}
+
+
+							imgPath = strPresentationPath + strMediaDirectory + "/" + strImage;
+							Log.d(TAG, "displayPage Video full path " + imgPath);
+							objVideoView = new VideoView(this);
+							objLayoutImage.removeAllViews();
+							objLayoutImage.addView(objVideoView);
+							layout = objVideoView.getLayoutParams();
+							//layout.width = (int) (intWidthTop * 0.80);
+							layout.width = ViewGroup.LayoutParams.FILL_PARENT;
+							layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+							try {
+								objVideoView.setVideoURI(Uri.parse(imgPath));
+								objVideoView.seekTo(intStartAt);
+								// if the video has a target create a listener to switch
+								// pages after the video
+								strVidTarget = objVideo.getItarget();
+								if (!strVidTarget.equals("")) {
+									Log.d(TAG, "displayPage Video target " + strVidTarget);
+									objVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+										public void onCompletion(MediaPlayer mp) {
+											Log.d(TAG, "displayPage Video.setOnCompletionListener display " + strVidTarget);
+											displayPage(strVidTarget, false);
+										}
+									});
+								}
+								// Play video
+								new Thread(new Runnable() {
+									public void run() {
+										objVideoView.start();
+									}
+								}).start();
+							} catch (Exception e1) {
+								Log.e(TAG, "displayPage Video Exception " + e1.getLocalizedMessage());
+							}
+							break;
 						}
-						strSet = elPage.getAttribute("unset");
-						if (!strSet.equals("")) {
-							UnsetFlags(strSet);
-							Log.d(TAG, "displayPage PageUnSet " + strSet);
-						}
-					} catch (Exception e1) {
-						Log.e(TAG, "displayPage PageFlags Exception " + e1.getLocalizedMessage());
 					}
-
-					// can't have a video and an image
-					// Video
-					tmpNodeList = elPage.getElementsByTagName("Video");
-					elImage = (Element) tmpNodeList.item(0);
-					if (elImage != null) {
-						strImage = elImage.getAttribute("id");
-						Log.d(TAG, "displayPage Video " + strImage);
-						strStartAt = elImage.getAttribute("start-at");
-						Log.d(TAG, "displayPage Video Start At " + strStartAt);
-						intStartAt = 0;
-						try {
-							if (strStartAt != "") {
-								intPos1 = strStartAt.indexOf(":");
-								if (intPos1 > -1) {
-									intPos2 = strStartAt.indexOf(":", intPos1 + 1);
-									if (intPos2 > -1) {
-										strHour = strStartAt.substring(0, intPos1);
-										strMinute = strStartAt.substring(intPos1 + 1, intPos2);
-										strSecond = strStartAt.substring(intPos2 + 1, strStartAt.length());
-										Log.d(TAG, "displayPage Video Start At Hour " + strHour + " Minute " + strMinute + " Second " + strSecond);
-										intStartAt = Integer.parseInt(strSecond) * 1000;
-										intStartAt = intStartAt + Integer.parseInt(strMinute) * 1000 * 60;
-										intStartAt = intStartAt + Integer.parseInt(strHour) * 1000 * 60 * 60;
+				} 
+				if (!blnVideo) {
+					// image
+					if (objCurrPage.getImageCount() > 0) {
+						for (int i2 = 0; i2 < objCurrPage.getImageCount(); i2++) {
+							objImage = objCurrPage.getImage(i2);
+							if (objImage.canShow(Flags)) {
+								strImage = objImage.getIid();
+								strImage = strImage.replace("\\", "/");
+								Log.d(TAG, "displayPage Image " + strImage);
+								int intSubDir = strImage.lastIndexOf("/");
+								String strSubDir;
+								if (intSubDir > -1) {
+									strSubDir = strImage.substring(0, intSubDir + 1);
+									strImage = strImage.substring(intSubDir + 1);
+								} else {
+									strSubDir = "/";
+								}
+								// String strSubDir
+								// Handle wildcard *
+								if (strImage.indexOf("*") > -1) {
+									strFilePatern = strImage;
+									// get the directory
+									File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
+									// wildcard filter class handles the filtering
+									java.io.FileFilter WildCardfilter = new WildCardFileFilter();
+									if (f.isDirectory()) {
+										// return a list of matching files
+										File[] children = f.listFiles(WildCardfilter);
+										// return a random image
+										int intFile = rndGen.nextInt(children.length);
+										Log.d(TAG, "displayPage Random Image Index " + intFile);
+										imgPath = strPresentationPath + strMediaDirectory + strSubDir + children[intFile].getName();
+										Log.d(TAG, "displayPage Random Image Chosen " + imgPath);
 									}
+								} else {
+									// no wildcard so just use the file name
+									imgPath = strPresentationPath + strMediaDirectory + strSubDir + strImage;
+									Log.d(TAG, "displayPage Non Random Image " + imgPath);
 								}
-							}
-						} catch (Exception e1) {
-							intStartAt = 0;
-							Log.e(TAG, "displayPage startat Exception " + e1.getLocalizedMessage());
-						}
+								File flImage = new File(imgPath);
+								if (flImage.exists()){
+									try {
+										if (blnImageBackground) {
+											// decodeSampledBitmapFromFile will resize the
+											// image
+											// before it gets to memory
+											// we can load large images using memory
+											// efficiently
+											// (and not run out of memory and crash the app)
 
-						strStopAt = elImage.getAttribute("stop-at");
-						Log.d(TAG, "displayPage Video Stop At " + strStopAt);
-						intStopAt = 0;
-						try {
-							if (strStopAt != "") {
-								intPos1 = strStopAt.indexOf(":");
-								if (intPos1 > -1) {
-									intPos2 = strStopAt.indexOf(":", intPos1 + 1);
-									if (intPos2 > -1) {
-										strHour = strStopAt.substring(0, intPos1);
-										strMinute = strStopAt.substring(intPos1 + 1, intPos2);
-										strSecond = strStopAt.substring(intPos2 + 1, strStopAt.length());
-										Log.d(TAG, "displayPage Video Stop At Hour " + strHour + " Minute " + strMinute + " Second " + strSecond);
-										intStopAt = Integer.parseInt(strSecond) * 1000;
-										intStopAt = intStopAt + Integer.parseInt(strMinute) * 1000 * 60;
-										intStopAt = intStopAt + Integer.parseInt(strHour) * 1000 * 60 * 60;
-									}
-								}
-							}
-						} catch (Exception e1) {
-							intStartAt = 0;
-							Log.e(TAG, "displayPage stopat Exception " + e1.getLocalizedMessage());
-						}
+											// Clear the parent layout
+											objLayoutImage.removeAllViews();
+											Bitmap objRetBitMap;
+											objRetBitMap = decodeSampledBitmapFromFile(imgPath, intWidthTop, intHeightTop);
+											int intHeightPad = 0;
+											int intWidthPad = 0;
+											if (objRetBitMap.getHeight() < intHeightTop) {
+												intHeightPad = intHeightTop - objRetBitMap.getHeight();
+											}
+											if (objRetBitMap.getWidth() < intWidthTop) {
+												intWidthPad = intWidthTop - objRetBitMap.getWidth();
+											}
+											Log.d(TAG, "displayPage Pad Image screen height " + intHeightTop);
+											Log.d(TAG, "displayPage Pad Image screen width " + intWidthTop);
+											Log.d(TAG, "displayPage Pad Image bitmap height " + objRetBitMap.getHeight());
+											Log.d(TAG, "displayPage Pad Image bitmap width " + objRetBitMap.getWidth());
+											Log.d(TAG, "displayPage Pad Image pad height " + intHeightPad);
+											Log.d(TAG, "displayPage Pad Image pad width " + intWidthPad);
+											if (intHeightPad != 0 || intWidthPad != 0) {
+												objRetBitMap = pad(objRetBitMap, intWidthPad, intHeightPad);
+											}
+											Drawable objDrawable = new BitmapDrawable(objRetBitMap);
+											objLayoutTop.setBackgroundDrawable(objDrawable);
+										} else {
+											// we create a new image view every time (we may
+											// have
+											// displayed a video last time)
+											objImageView = new ImageView(this);
+											// decodeSampledBitmapFromFile will resize the
+											// image
+											// before it gets to memory
+											// we can load large images using memory
+											// efficiently
+											// (and not run out of memory and crash the app)
 
-						
-						imgPath = strPresentationPath + strMediaDirectory + "/" + strImage;
-						Log.d(TAG, "displayPage Video full path " + imgPath);
-						objVideoView = new VideoView(this);
-						objLayoutImage.removeAllViews();
-						objLayoutImage.addView(objVideoView);
-						layout = objVideoView.getLayoutParams();
-						layout.width = (int) (intWidthTop * 0.80);
-						layout.height = ViewGroup.LayoutParams.FILL_PARENT;
-						try {
-							objVideoView.setVideoURI(Uri.parse(imgPath));
-							objVideoView.seekTo(intStartAt);
-							// if the video has a target create a listener to switch
-							// pages after the video
-							strVidTarget = elImage.getAttribute("target");
-							if (!strVidTarget.equals("")) {
-								Log.d(TAG, "displayPage Video target " + strVidTarget);
-								objVideoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-									public void onCompletion(MediaPlayer mp) {
-										Log.d(TAG, "displayPage Video.setOnCompletionListener display " + strVidTarget);
-										displayPage(strVidTarget, false);
-
-									}
-								});
-							}
-							// Play video
-							new Thread(new Runnable() {
-								public void run() {
-									objVideoView.start();
-								}
-							}).start();
-						} catch (Exception e1) {
-							Log.e(TAG, "displayPage Video Exception " + e1.getLocalizedMessage());
-						}
-					} else {
-						// image
-						tmpNodeList = elPage.getElementsByTagName("Image");
-						elImage = (Element) tmpNodeList.item(0);
-						if (elImage != null) {
-
-							strImage = elImage.getAttribute("id");
-							strImage = strImage.replace("\\", "/");
-							Log.d(TAG, "displayPage Image " + strImage);
-							int intSubDir = strImage.lastIndexOf("/");
-							String strSubDir;
-							if (intSubDir > -1) {
-								strSubDir = "/" + strImage.substring(0, intSubDir + 1);
-								strImage = strImage.substring(intSubDir + 1);
-							} else {
-								strSubDir = "";
-							}
-							// String strSubDir
-							// Handle wildcard *
-							if (strImage.indexOf("*") > -1) {
-								strFilePatern = strImage;
-								// get the directory
-								File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
-								// wildcard filter class handles the filtering
-								java.io.FileFilter WildCardfilter = new WildCardFileFilter();
-								if (f.isDirectory()) {
-									// return a list of matching files
-									File[] children = f.listFiles(WildCardfilter);
-									// return a random image
-									int intFile = rndGen.nextInt(children.length);
-									Log.d(TAG, "displayPage Random Image Index " + intFile);
-									imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + children[intFile].getName();
-									Log.d(TAG, "displayPage Random Image Chosen " + imgPath);
-								}
-							} else {
-								// no wildcard so just use the file name
-								imgPath = strPresentationPath + strMediaDirectory + strSubDir + "/" + strImage;
-								Log.d(TAG, "displayPage Non Random Image " + imgPath);
-							}
-							File flImage = new File(imgPath);
-							if (flImage.exists()){
-								try {
-									if (blnImageBackground) {
-										// decodeSampledBitmapFromFile will resize the
-										// image
-										// before it gets to memory
-										// we can load large images using memory
-										// efficiently
-										// (and not run out of memory and crash the app)
-										
-										// Clear the parent layout
+											objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
+											// Clear the parent layout
+											objLayoutImage.removeAllViews();
+											objLayoutTop.setBackgroundDrawable(null);
+											// add the new image to it and set it to fill
+											// the
+											// available area
+											objLayoutImage.addView(objImageView);
+											layout = objImageView.getLayoutParams();
+											layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+											layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+											objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+											objImageView.setLayoutParams(layout);
+											objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
+											blnImageZoomed = false;
+										}
+									} catch (Exception e1) {
 										objLayoutImage.removeAllViews();
-										Bitmap objRetBitMap;
-										objRetBitMap = decodeSampledBitmapFromFile(imgPath, intWidthTop, intHeightTop);
-										int intHeightPad = 0;
-										int intWidthPad = 0;
-										if (objRetBitMap.getHeight() < intHeightTop) {
-											intHeightPad = intHeightTop - objRetBitMap.getHeight();
-										}
-										if (objRetBitMap.getWidth() < intWidthTop) {
-											intWidthPad = intWidthTop - objRetBitMap.getWidth();
-										}
-										Log.d(TAG, "displayPage Pad Image screen height " + intHeightTop);
-										Log.d(TAG, "displayPage Pad Image screen width " + intWidthTop);
-										Log.d(TAG, "displayPage Pad Image bitmap height " + objRetBitMap.getHeight());
-										Log.d(TAG, "displayPage Pad Image bitmap width " + objRetBitMap.getWidth());
-										Log.d(TAG, "displayPage Pad Image pad height " + intHeightPad);
-										Log.d(TAG, "displayPage Pad Image pad width " + intWidthPad);
-										if (intHeightPad != 0 || intWidthPad != 0) {
-											objRetBitMap = pad(objRetBitMap, intWidthPad, intHeightPad);
-										}
-										Drawable objDrawable = new BitmapDrawable(objRetBitMap);
-										objLayoutTop.setBackgroundDrawable(objDrawable);
-									} else {
-										// we create a new image view every time (we may
-										// have
-										// displayed a video last time)
-										objImageView = new ImageView(this);
-										// decodeSampledBitmapFromFile will resize the
-										// image
-										// before it gets to memory
-										// we can load large images using memory
-										// efficiently
-										// (and not run out of memory and crash the app)
-
-										objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
-										// Clear the parent layout
-										objLayoutImage.removeAllViews();
-										objLayoutTop.setBackgroundDrawable(null);
-										// add the new image to it and set it to fill
-										// the
-										// available area
-										objLayoutImage.addView(objImageView);
-										layout = objImageView.getLayoutParams();
-										layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
-										layout.height = ViewGroup.LayoutParams.FILL_PARENT;
-										objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-										objImageView.setLayoutParams(layout);
-										objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
-										blnImageZoomed = false;
+										Log.e(TAG, "displayPage Image Exception " + e1.getLocalizedMessage());
 									}
-								} catch (Exception e1) {
+								} else {
+									// No image
 									objLayoutImage.removeAllViews();
-									Log.e(TAG, "displayPage Image Exception " + e1.getLocalizedMessage());
+									objLayoutTop.setBackgroundDrawable(null);
 								}
 							} else {
 								// No image
 								objLayoutImage.removeAllViews();
+								objLayoutTop.setBackgroundDrawable(null);
 							}
-						} else {
-							// No image
-							objLayoutImage.removeAllViews();
 						}
+					} else {
+						// No image
+						objLayoutImage.removeAllViews();
+						objLayoutTop.setBackgroundDrawable(null);
 					}
+				}
 
-					// text
-					tmpNodeList = elPage.getElementsByTagName("Text");
-					try {
-						elText = tmpNodeList.item(0);
-						String strTemp = getInnerXml(elText, true);
-						strTemp = strTemp.replace("<P>", "");
-						strTemp = strTemp.replace("<p>", "");
-						strTemp = strTemp.replace("</P>", "<br>");
-						strTemp = strTemp.replace("</p>", "<br>");
-						strTemp = strTemp.replace("<DIV>", "");
-						strTemp = strTemp.replace("<div>", "");
-						strTemp = strTemp.replace("</DIV>", "<br>");
-						strTemp = strTemp.replace("</div>", "<br>");
-						if (strTemp.endsWith("<br>")) {
-							strTemp = strTemp.substring(0, strTemp.length() - 4);
-						}
-						if (!blnImageBackground) {
-							strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:"
-									+ MintFontSize + "px } </style></head><body>" + strTemp + "</body></html>";
-							//objWebView1.loadData(strHTML, "text/html", null);
-							objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
-							objWebView1.setBackgroundColor(color.black);
-						} else {
-							
-							strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: rgba(0,0,0,0); font-family: Tahoma; font-size:"
-									+ MintFontSize + "px } div {background-color: rgba(0,0,0,0); position: absolute; bottom: 0; text-shadow: 2px 2px #000000} </style></head><body><div>" + strTemp + "</div></body></html>";
-							//objWebView1.loadData(strHTML, "text/html", null);
-							objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
-							objWebView1.setBackgroundColor(0);
-						}
-					} catch (Exception e1) {
-						Log.e(TAG, "displayPage Text Exception " + e1.getLocalizedMessage());
+
+				// text
+				try {
+					String strTemp = objCurrPage.getText();
+					strTemp = strTemp.replace("<P>", "");
+					strTemp = strTemp.replace("<p>", "");
+					strTemp = strTemp.replace("</P>", "<br>");
+					strTemp = strTemp.replace("</p>", "<br>");
+					strTemp = strTemp.replace("<DIV>", "");
+					strTemp = strTemp.replace("<div>", "");
+					strTemp = strTemp.replace("</DIV>", "<br>");
+					strTemp = strTemp.replace("</div>", "<br>");
+					if (strTemp.endsWith("<br>")) {
+						strTemp = strTemp.substring(0, strTemp.length() - 4);
+					}
+					if (!blnImageBackground) {
+						strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: black; font-family: Tahoma; font-size:"
+								+ MintFontSize + "px } </style></head><body>" + strTemp + "</body></html>";
+						//objWebView1.loadData(strHTML, "text/html", null);
+						objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
+						objWebView1.setBackgroundColor(color.black);
+					} else {
+
 						strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: rgba(0,0,0,0); font-family: Tahoma; font-size:"
-								+ MintFontSize + "px } div {background-color: rgba(0,0,0,0.25); position: absolute; bottom: 0} </style></head><body><div></div></body></html>";
-						objWebView1.loadData(strHTML, "text/html", null);
+								+ MintFontSize + "px } div {background-color: rgba(0,0,0,0); position: absolute; bottom: 0; text-shadow: 2px 2px #000000} </style></head><body><div>" + strTemp + "</div></body></html>";
+						//objWebView1.loadData(strHTML, "text/html", null);
+						objWebView1.loadDataWithBaseURL(null, strHTML, "text/html", null, null);
 						objWebView1.setBackgroundColor(0);
 					}
+				} catch (Exception e1) {
+					Log.e(TAG, "displayPage Text Exception " + e1.getLocalizedMessage());
+					strHTML = "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd\"><html  xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\"><head><meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\" /><title></title><style type=\"text/css\"> body { color: white; background-color: rgba(0,0,0,0); font-family: Tahoma; font-size:"
+							+ MintFontSize + "px } div {background-color: rgba(0,0,0,0.25); position: absolute; bottom: 0} </style></head><body><div></div></body></html>";
+					objWebView1.loadData(strHTML, "text/html", null);
+					objWebView1.setBackgroundColor(0);
+				}
 
-					// delay
-					//
-					strDelaySet = "";
-					strDelayUnSet = "";
-					tmpNodeList = elPage.getElementsByTagName("Delay");
-					elDelay = (Element) tmpNodeList.item(0);
 
-						try {
-							if (elDelay != null) {
-								Log.d(TAG, "displayPage Delay");
-								// test to see if we need this delay
-								blnTestSet = true;
-								blnTestNotSet = true;
-								strTest = elDelay.getAttribute("if-set");
-								if (!strTest.equals("")) {
-									blnTestSet = MatchesIfSetCondition(strTest);
-									Log.d(TAG, "displayPage Delay if-set" + strTest);
-								}
-								strTest = elDelay.getAttribute("if-not-set");
-								if (!strTest.equals("")) {
-									blnTestNotSet = MatchesIfNotSetCondition(strTest);
-									Log.d(TAG, "displayPage Delay if-not-set" + strTest);
-								}
+				// buttons
+				// remove old buttons
+				LinearLayout btnLayout = (LinearLayout) findViewById(R.id.btnLayout);
+				btnLayout.removeAllViews();
 
-								if (blnTestSet && blnTestNotSet) {
-									strDelSeconds = elDelay.getAttribute("seconds");
-									strDelStyle = elDelay.getAttribute("style");
-									strDelTarget = elDelay.getAttribute("target");
-									strDelStartAt = elDelay.getAttribute("start-with");
-									try {
-										intDelStartAt = Integer.parseInt(strDelStartAt);
-									} catch (Exception etemp) {
-										intDelStartAt = 0;
-									}
-									// record any delay set / unset
-									strSet = elDelay.getAttribute("set");
-									if (!strSet.equals("")) {
-										strDelaySet = strSet;
-									}
-									strSet = elDelay.getAttribute("unset");
-									if (!strSet.equals("")) {
-										strDelayUnSet = strSet;
-									}
-									Log.d(TAG, "displayPage Delay Seconds " + strDelSeconds + " Style " + strDelStyle + " Target " + strDelTarget + " Set " + strDelaySet + " UnSet " + strDelayUnSet);
-
-									// handle random Delay
-									intPos1 = strDelSeconds.indexOf("(");
-									intDelSeconds = 0;
-									if (intPos1 > -1) {
-										intPos2 = strDelSeconds.indexOf("..", intPos1);
-										if (intPos2 > -1) {
-											intPos3 = strDelSeconds.indexOf(")", intPos2);
-											if (intPos3 > -1) {
-												strMin = strDelSeconds.substring(intPos1 + 1, intPos2);
-												intMin = Integer.parseInt(strMin);
-												strMax = strDelSeconds.substring(intPos2 + 2, intPos3);
-												intMax = Integer.parseInt(strMax);
-												int i1 = mRandom.nextInt(intMax - intMin) + intMin;
-												intDelSeconds = i1;
-												Log.d(TAG, "displayPage Random Delay Min " + strMin + " Max " + strMax + " Chosen " + intDelSeconds);
-											}
-										}
-									} else {
-										intDelSeconds = Integer.parseInt(strDelSeconds);
-									}
-									if (!reDisplay) {
-										if (intDelSeconds == 0) { 
-											tmrPageTimer = new PageTimer(250, 0, 250);
-											tmrPageTimer.start();
-										} else {
-											intDelSeconds = intDelSeconds * 1000;
-											tmrPageTimer = new PageTimer(intDelSeconds, intDelStartAt, 1000);
-											tmrPageTimer.start();
-										}
-									}
-								}
-							} else {
-								objCountText.setText("");
-							}
-						} catch (Exception e1) {
-							Log.e(TAG, "displayPage Delay Exception " + e1.getLocalizedMessage());
-							objCountText.setText("");
-						}
-					
-					// buttons
-					// remove old buttons
-					LinearLayout btnLayout = (LinearLayout) findViewById(R.id.btnLayout);
-					btnLayout.removeAllViews();
-
-					// add new buttons
-					tmpNodeList = elPage.getElementsByTagName("Button");
-					intDpLeft = intBtnLetters;
-					btnLayoutRow = new LinearLayout(this);
-					btnLayoutRow.setOrientation(LinearLayout.HORIZONTAL);
-					intRows = 1;
-					btnLayout.addView(btnLayoutRow);
-					layout = btnLayoutRow.getLayoutParams();
-					layout.height = LayoutParams.WRAP_CONTENT;
-					layout.width = LayoutParams.WRAP_CONTENT;
-					btnLayoutRow.setLayoutParams(layout);
-					btnLayoutRow.setWeightSum(intBtnLetters);
-					for (int i1 = tmpNodeList.getLength() - 1; i1 >= 0; i1--) {
-						try {
-							elButton = (Element) tmpNodeList.item(i1);
-
-							if (elButton != null) {
-
-								// test to see if we need this button
-								blnTestSet = true;
-								blnTestNotSet = true;
-								strTest = elButton.getAttribute("if-set");
-								if (!strTest.equals("")) {
-									blnTestSet = MatchesIfSetCondition(strTest);
-									Log.d(TAG, "displayPage Button if-set " + strTest);
-								} else {
-									strTest = elButton.getAttribute("if-not-set");
-									if (!strTest.equals("")) {
-										blnTestNotSet = MatchesIfNotSetCondition(strTest);
-										Log.d(TAG, "displayPage Button if-not-set " + strTest);
-									}
-								}
-
-								if (blnTestSet && blnTestNotSet) {
-
-									strBtnTarget = elButton.getAttribute("target");
-
-									StringBuffer buffer = new StringBuffer();
-									NodeList childList = elButton.getChildNodes();
-									for (int i11 = 0; i11 < childList.getLength(); i11++) {
-										Node child = childList.item(i11);
-										if (child.getNodeType() == Node.TEXT_NODE) {
-											buffer.append(child.getNodeValue());
-										}
-									}
-									strBtnText = buffer.toString();
-									intBtnLen = strBtnText.length();
-									if (intBtnLen < 5) {
-										intBtnLen = 5;
-									}
-									Button btnDynamic = new Button(this);
-									btnDynamic.setText(strBtnText);
-									btnDynamic.setTextSize(MintFontSize);
-									btnDynamic.setShadowLayer(9, 1, 1, Color.rgb(44,44,44));
-									btnDynamic.setTextColor(Color.WHITE);
-									if (intTransparency == 255) {
-										btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_black_glossy));
-									} else {
-										btnDynamic.getBackground().setAlpha(intTransparency);
-									}
-									
-
-									if (intDpLeft < intBtnLen) {
-										intRows = 2;
-										intDpLeft = intBtnLetters;
-										btnLayoutRow2 = new LinearLayout(this);
-										btnLayoutRow2.setOrientation(LinearLayout.HORIZONTAL);
-										layout = btnLayoutRow.getLayoutParams();
-										layout.height = LayoutParams.WRAP_CONTENT;
-										layout.width = LayoutParams.WRAP_CONTENT;
-										btnLayoutRow2.setLayoutParams(layout);
-										btnLayoutRow2.setWeightSum(intBtnLetters);
-										btnLayout.addView(btnLayoutRow2);
-									}
-									intDpLeft = intDpLeft - intBtnLen;
-
-									// record any button set / unset
-									String strButtonSet;
-									String strButtonUnSet;
-									strButtonSet = elButton.getAttribute("set");
-									if (!strButtonSet.equals("")) {
-										btnDynamic.setTag(R.string.TagSetFlags, strButtonSet);
-									} else {
-										btnDynamic.setTag(R.string.TagSetFlags, "");
-									}
-									strButtonUnSet = elButton.getAttribute("unset");
-									if (!strButtonUnSet.equals("")) {
-										btnDynamic.setTag(R.string.TagUnSetFlags, strButtonUnSet);
-									} else {
-										btnDynamic.setTag(R.string.TagUnSetFlags, "");
-									}
-
-									Log.d(TAG, "displayPage Button Text " + strBtnText + " Target " + strBtnTarget + " Set " + strButtonSet + " UnSet " + strButtonUnSet);
-
-									btnDynamic.setTag(R.string.TagPage, strBtnTarget);
-									btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
-									if (intRows == 1) {
-										btnLayoutRow.addView(btnDynamic);
-									} else {
-										btnLayoutRow2.addView(btnDynamic);
-									}
-									btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
-									btnLayoutParm.width = 0;
-									btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
-									if (blnImageBackground) {
-										btnLayoutParm.weight = intBtnLen;
-									} else {
-										btnLayoutParm.weight = intBtnLen * 2;
-									}
-									btnDynamic.setLayoutParams(btnLayoutParm);
-								}
-							}
-						} catch (Exception e1) {
-							Log.e(TAG, "displayPage Buttons Exception " + e1.getLocalizedMessage());
-						}
-					}
+				// add new buttons
+				intDpLeft = intBtnLetters;
+				btnLayoutRow = new LinearLayout(this);
+				btnLayoutRow.setOrientation(LinearLayout.HORIZONTAL);
+				intRows = 1;
+				btnLayout.addView(btnLayoutRow);
+				layout = btnLayoutRow.getLayoutParams();
+				layout.height = LayoutParams.WRAP_CONTENT;
+				layout.width = LayoutParams.WRAP_CONTENT;
+				btnLayoutRow.setLayoutParams(layout);
+				btnLayoutRow.setWeightSum(intBtnLetters);
+				for (int i1 = objCurrPage.getButtonCount() - 1; i1 >= 0; i1--) {
 					try {
-						if (blnDebug) {
-							// add a button to trigger the delay target
-							if (elDelay != null) {
-								Button btnDynamic = new Button(this);
-								btnDynamic.setText("Delay");
-								btnDynamic.setTextSize(MintFontSize);
-								btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_default_normal));
+						objButton = objCurrPage.getButton(i1);
 
-								if (intDpLeft < 8) {
+							if (objButton.canShow(Flags)) {
+
+								strBtnTarget = objButton.getTarget();
+								strBtnText = objButton.getText();
+								intBtnLen = strBtnText.length();
+								if (intBtnLen < 5) {
+									intBtnLen = 5;
+								}
+								Button btnDynamic = new Button(this);
+								btnDynamic.setText(strBtnText);
+								btnDynamic.setTextSize(MintFontSize);
+								btnDynamic.setShadowLayer(9, 1, 1, Color.rgb(44,44,44));
+								btnDynamic.setTextColor(Color.WHITE);
+								if (intTransparency == 255) {
+									btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_black_glossy));
+								} else {
+									btnDynamic.getBackground().setAlpha(intTransparency);
+								}
+
+
+								if (intDpLeft < intBtnLen) {
+									intRows = 2;
 									intDpLeft = intBtnLetters;
-									btnLayoutRow = new LinearLayout(this);
+									btnLayoutRow2 = new LinearLayout(this);
+									btnLayoutRow2.setOrientation(LinearLayout.HORIZONTAL);
 									layout = btnLayoutRow.getLayoutParams();
 									layout.height = LayoutParams.WRAP_CONTENT;
 									layout.width = LayoutParams.WRAP_CONTENT;
-									btnLayoutRow.setLayoutParams(layout);
-									btnLayoutRow.setWeightSum(intBtnLetters);
-									btnLayout.addView(btnLayoutRow);
+									btnLayoutRow2.setLayoutParams(layout);
+									btnLayoutRow2.setWeightSum(intBtnLetters);
+									btnLayout.addView(btnLayoutRow2);
+								}
+								intDpLeft = intDpLeft - intBtnLen;
 
+								// record any button set / unset
+								String strButtonSet;
+								String strButtonUnSet;
+								strButtonSet = objButton.getSet();
+								if (!strButtonSet.equals("")) {
+									btnDynamic.setTag(R.string.TagSetFlags, strButtonSet);
 								} else {
-									intDpLeft = intDpLeft - 8;
+									btnDynamic.setTag(R.string.TagSetFlags, "");
+								}
+								strButtonUnSet = objButton.getUnSet();
+								if (!strButtonUnSet.equals("")) {
+									btnDynamic.setTag(R.string.TagUnSetFlags, strButtonUnSet);
+								} else {
+									btnDynamic.setTag(R.string.TagUnSetFlags, "");
 								}
 
-								btnDynamic.setTag(R.string.TagSetFlags, strDelaySet);
-								btnDynamic.setTag(R.string.TagUnSetFlags, strDelayUnSet);
-								btnDynamic.setTag(R.string.TagPage, strDelTarget);
-								btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
-								btnLayoutRow.addView(btnDynamic);
+								Log.d(TAG, "displayPage Button Text " + strBtnText + " Target " + strBtnTarget + " Set " + strButtonSet + " UnSet " + strButtonUnSet);
 
+								btnDynamic.setTag(R.string.TagPage, strBtnTarget);
+								btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
+								if (intRows == 1) {
+									btnLayoutRow.addView(btnDynamic);
+								} else {
+									btnLayoutRow2.addView(btnDynamic);
+								}
 								btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
 								btnLayoutParm.width = 0;
 								btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
 								if (blnImageBackground) {
-									btnLayoutParm.weight = 8;
+									btnLayoutParm.weight = intBtnLen;
 								} else {
-									btnLayoutParm.weight = 16;
+									btnLayoutParm.weight = intBtnLen * 2;
 								}
 								btnDynamic.setLayoutParams(btnLayoutParm);
 							}
-							TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
-							objDebugText.setText(" " + strPageName);
-						} else {
-							TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
-							objDebugText.setText(strTitle);
-						}
 					} catch (Exception e1) {
-						Log.e(TAG, "displayPage Debug Exception " + e1.getLocalizedMessage());
+						Log.e(TAG, "displayPage Buttons Exception " + e1.getLocalizedMessage());
 					}
+				}
+				try {
+					if (blnDebug) {
+						// add a button to trigger the delay target
+						if (blnDelay) {
+							Button btnDynamic = new Button(this);
+							btnDynamic.setText("Delay");
+							btnDynamic.setTextSize(MintFontSize);
+							btnDynamic.setBackgroundDrawable(getResources().getDrawable(R.drawable.btn_default_normal));
 
-					if (!reDisplay) {
-						// Audio / Metronome
-						tmpNodeList = elPage.getElementsByTagName("Metronome");
-						elMetronome = (Element) tmpNodeList.item(0);
-						if (elMetronome != null) {
-							// Metronome
-							String strbpm = elMetronome.getAttribute("bpm");
-							int intbpm = Integer.parseInt(strbpm);
-							Log.d(TAG, "displayPage Metronome " + intbpm + " BPM");
-							intbpm = 60000 / intbpm;
-							try {
-								tmrTetronome = new Timer();
-								tmrTetronome.schedule(new MetronomeTask(), intbpm, intbpm);
-							} catch (IllegalArgumentException e) {
-								Log.e(TAG, "displayPage IllegalArgumentException ", e);
-							} catch (IllegalStateException e) {
-								Log.e(TAG, "displayPage IllegalStateException ", e);
-							} catch (Exception e) {
-								Log.e(TAG, "displayPage Exception ", e);
+							if (intDpLeft < 8) {
+								intDpLeft = intBtnLetters;
+								btnLayoutRow = new LinearLayout(this);
+								layout = btnLayoutRow.getLayoutParams();
+								layout.height = LayoutParams.WRAP_CONTENT;
+								layout.width = LayoutParams.WRAP_CONTENT;
+								btnLayoutRow.setLayoutParams(layout);
+								btnLayoutRow.setWeightSum(intBtnLetters);
+								btnLayout.addView(btnLayoutRow);
+
+							} else {
+								intDpLeft = intDpLeft - 8;
 							}
-						} else {
-							// Audio
-							tmpNodeList = elPage.getElementsByTagName("Audio");
-							elAudio = (Element) tmpNodeList.item(0);
-							if (elAudio != null) {
+
+							btnDynamic.setTag(R.string.TagSetFlags, strDelaySet);
+							btnDynamic.setTag(R.string.TagUnSetFlags, strDelayUnSet);
+							btnDynamic.setTag(R.string.TagPage, strDelTarget);
+							btnDynamic.setOnClickListener(getOnClickDoSomething(btnDynamic));
+							btnLayoutRow.addView(btnDynamic);
+
+							btnLayoutParm = (android.widget.LinearLayout.LayoutParams) btnDynamic.getLayoutParams();
+							btnLayoutParm.width = 0;
+							btnLayoutParm.height = LayoutParams.WRAP_CONTENT;
+							if (blnImageBackground) {
+								btnLayoutParm.weight = 8;
+							} else {
+								btnLayoutParm.weight = 16;
+							}
+							btnDynamic.setLayoutParams(btnLayoutParm);
+						}
+						TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
+						objDebugText.setText(" " + strPageName);
+					} else {
+						TextView objDebugText = (TextView) findViewById(R.id.textViewDebug);
+						objDebugText.setText(strTitle);
+					}
+				} catch (Exception e1) {
+					Log.e(TAG, "displayPage Debug Exception " + e1.getLocalizedMessage());
+				}
+
+				if (!reDisplay) {
+					// Audio / Metronome
+					blnMetronome = false;
+					if (objCurrPage.getMetronomeCount() > 0) {
+						for (int i2 = 0; i2 < objCurrPage.getMetronomeCount(); i2++) {
+							objMetronome = objCurrPage.getMetronome(i2);
+							if (objMetronome.canShow(Flags)) {
+								blnMetronome = true;
+								// Metronome
+								int intbpm = objMetronome.getbpm();
+
+								Log.d(TAG, "displayPage Metronome " + intbpm + " BPM");
+								intbpm = 60000 / intbpm;
 								try {
-									String strIntAudio = elAudio.getAttribute("repeat");
-									if (strIntAudio.equals("")) {
-										intAudioLoops = 0;
-									} else {
-										intAudioLoops = Integer.parseInt(strIntAudio);
-									}
-									strAudio = elAudio.getAttribute("id");
-									Log.d(TAG, "displayPage Audio " + strAudio);
-									strAudioTarget = elImage.getAttribute("target");
-									Log.d(TAG, "displayPage Audio target " + strAudioTarget);
-									// run audio on another thread
-									new Thread(new Runnable() {
-										public void run() {
-											mMediaPlayer = new MediaPlayer();
-											try {
-												mMediaPlayer.setDataSource(strPresentationPath + strMediaDirectory + "/" + strAudio);
-												mMediaPlayer.prepare();
-												// if we have a target or a number of loops do some additional processing
-												if (!strAudioTarget.equals("") || intAudioLoops > 0) {
-													Log.d(TAG, "displayPage Audio.setOnCompletionListener set target " + strAudioTarget + " loops " + intAudioLoops);
-													//set a listener for the end of the audio
-													mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-														public void onCompletion(MediaPlayer mp) {
-															//if we still need to loop play it again
-															if (intAudioLoops > 0) {
-																Log.d(TAG, "displayPage Audio.setOnCompletionListener Loop " + intAudioLoops);
-																intAudioLoops = intAudioLoops - 1;
-																//restart the audio
-																mMediaPlayer.stop();
-																mMediaPlayer.start();
-															} else {
-																//if we don't need to loop and we have a target display the target page
-																if (!strAudioTarget.equals("")) {
-																	Log.d(TAG, "displayPage Audio.setOnCompletionListener display " + strAudioTarget);
-																	displayPage(strAudioTarget, false);
-																}
-															}
-														}
-													});
-												}
-											} catch (IllegalArgumentException e) {
-												Log.e(TAG, "displayPage IllegalArgumentException ", e);
-											} catch (IllegalStateException e) {
-												Log.e(TAG, "displayPage IllegalStateException ", e);
-											} catch (IOException e) {
-												Log.e(TAG, "displayPage IOException ", e);
-											}
-											Log.d(TAG, "displayPage Audio Start");
-											//start the audio
-											mMediaPlayer.start();
-										}
-									}).start();
-								} catch (Exception e1) {
-									Log.e(TAG, "displayPage Audio Exception " + e1.getLocalizedMessage());
+									tmrTetronome = new Timer();
+									tmrTetronome.schedule(new MetronomeTask(), intbpm, intbpm);
+								} catch (IllegalArgumentException e) {
+									Log.e(TAG, "displayPage IllegalArgumentException ", e);
+								} catch (IllegalStateException e) {
+									Log.e(TAG, "displayPage IllegalStateException ", e);
+								} catch (Exception e) {
+									Log.e(TAG, "displayPage Exception ", e);
 								}
 							}
 						}
 					}
-					// found the right page and processed it so break out of the loop
-					break;
+					if (!blnMetronome) {
+						// Audio
+						if (objCurrPage.getAudioCount() > 0) {
+							for (int i2 = 0; i2 < objCurrPage.getAudioCount(); i2++) {
+								objAudio = objCurrPage.getAudio(i2);
+								if (objAudio.canShow(Flags)) {
+									try {
+										String strIntAudio = objAudio.getRepeat();
+										if (strIntAudio.equals("")) {
+											intAudioLoops = 0;
+										} else {
+											intAudioLoops = Integer.parseInt(strIntAudio);
+										}
+										strAudio = objAudio.getIid();
+										Log.d(TAG, "displayPage Audio " + strAudio);
+
+										strAudio = strAudio.replace("\\", "/");
+										Log.d(TAG, "displayPage Audio " + strAudio);
+										int intSubDir = strAudio.lastIndexOf("/");
+										String strSubDir;
+										if (intSubDir > -1) {
+											strSubDir = strAudio.substring(0, intSubDir + 1);
+											strAudio = strAudio.substring(intSubDir + 1);
+										} else {
+											strSubDir = "/";
+										}
+
+										// Handle wildcard *
+										if (strAudio.indexOf("*") > -1) {
+											strFilePatern = strAudio;
+											// get the directory
+											File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
+											// wildcard filter class handles the filtering
+											java.io.FileFilter WildCardfilter = new WildCardFileFilter();
+											if (f.isDirectory()) {
+												// return a list of matching files
+												File[] children = f.listFiles(WildCardfilter);
+												// return a random sound
+												int intFile = rndGen.nextInt(children.length);
+												Log.d(TAG, "displayPage Random Audio Index " + intFile);
+												strAudio = strPresentationPath + strMediaDirectory + strSubDir + children[intFile].getName();
+												Log.d(TAG, "displayPage Random Audio Chosen " + imgPath);
+											}
+										} else {
+											// no wildcard so just use the file name
+											strAudio = strPresentationPath + strMediaDirectory + strSubDir + "/" + strAudio;
+											Log.d(TAG, "displayPage Non Random Image " + imgPath);
+										}
+
+										strAudioTarget = objAudio.getTarget();
+										Log.d(TAG, "displayPage Audio target " + strAudioTarget);
+										// run audio on another thread
+										new Thread(new Runnable() {
+											public void run() {
+												mMediaPlayer = new MediaPlayer();
+												try {
+													mMediaPlayer.setDataSource(strAudio);
+													mMediaPlayer.prepare();
+													// if we have a target or a number of loops do some additional processing
+													if (!strAudioTarget.equals("") || intAudioLoops > 0) {
+														Log.d(TAG, "displayPage Audio.setOnCompletionListener set target " + strAudioTarget + " loops " + intAudioLoops);
+														//set a listener for the end of the audio
+														mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+															public void onCompletion(MediaPlayer mp) {
+																//if we still need to loop play it again
+																if (intAudioLoops > 0) {
+																	Log.d(TAG, "displayPage Audio.setOnCompletionListener Loop " + intAudioLoops);
+																	intAudioLoops = intAudioLoops - 1;
+																	//restart the audio
+																	mMediaPlayer.stop();
+																	mMediaPlayer.start();
+																} else {
+																	//if we don't need to loop and we have a target display the target page
+																	if (!strAudioTarget.equals("")) {
+																		Log.d(TAG, "displayPage Audio.setOnCompletionListener display " + strAudioTarget);
+																		displayPage(strAudioTarget, false);
+																	}
+																}
+															}
+														});
+													}
+												} catch (IllegalArgumentException e) {
+													Log.e(TAG, "displayPage IllegalArgumentException ", e);
+												} catch (IllegalStateException e) {
+													Log.e(TAG, "displayPage IllegalStateException ", e);
+												} catch (IOException e) {
+													Log.e(TAG, "displayPage IOException ", e);
+												}
+												Log.d(TAG, "displayPage Audio Start");
+												//start the audio
+												mMediaPlayer.start();
+											}
+										}).start();
+									} catch (Exception e1) {
+										Log.e(TAG, "displayPage Audio Exception " + e1.getLocalizedMessage());
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 
 			// Save current page and flags
+			// set page
+			if (blnAutoSetPage) {
+				Flags.add(strPageName);
+			}
+			// do page set / unset
+			try {
+				objCurrPage.setUnSet(Flags);
+			} catch (Exception e1) {
+				Log.e(TAG, "displayPage PageFlags Exception " + e1.getLocalizedMessage());
+			}
 			SharedPreferences.Editor objPrefEdit;
 			objPrefEdit = objLocalVarianbles.edit();
 			objPrefEdit.putString("CurrentPage", strPageName);
-			strFlags = GetFlags();
+			strFlags = comFun.GetFlags(Flags);
 			Log.d(TAG, "displayPage End Flags " + strFlags);
 			objPrefEdit.putString("Flags", strFlags);
 			objPrefEdit.commit();
@@ -1242,50 +1203,326 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 	}
 
+	public enum TagName
+	{
+		Title, Author, MediaDirectory, Settings, Page, Metronome, Image, Audio, Video, Delay, Button, Text, NOVALUE;
+
+	    public static TagName toTag(String str)
+	    {
+	        try {
+	            return valueOf(str);
+	        } 
+	        catch (Exception ex) {
+	            return NOVALUE;
+	        }
+	    }   
+	}	
+	
 	public String loadXML(String xmlFileName) {
-		NodeList objNodeList;
-		Element objMediaElement;
-		Element objAutoset;
-		Element objTitle;
-		Element objSettings;
-		Node objTemp;
-		Element objAuthor;
-		String strTmpTitle;
-		String strTmpAuthor;
+		String strTmpTitle = "";
+		String strTmpAuthor = "";
 		String strPage = "start";
 		String strFlags;
 		String strPreXMLPath;
-
+		String pageName; 
+		String ifSet; 
+		String ifNotSet; 
+		String Set;
+		String UnSet;
+		String strTag;
+		page Ipage = null;
+		
 		try {
 			objLocalVarianbles = getSharedPreferences(xmlFileName, MODE_PRIVATE);
-			Flags = new ArrayList<String>();
+			Flags.clear();
+			Ipages.clear();
+			blnAutoSetPage = true;
 			strPreXMLPath = strPresentationPath + xmlFileName;
-			File preXMLFile = new File(strPreXMLPath);
-			objDocumentBuilderFactory = DocumentBuilderFactory.newInstance();
-			objDocumentBuilder = objDocumentBuilderFactory.newDocumentBuilder();
-			objDocPresXML = objDocumentBuilder.parse(preXMLFile);
-			objDocPresXML.getDocumentElement().normalize();
+			
+	         XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+	         factory.setNamespaceAware(true);
+	         XmlPullParser xpp = factory.newPullParser();
+	         File preXMLFile = new File(strPreXMLPath);
+	         FileInputStream fis = new FileInputStream(preXMLFile);
+	         UnicodeBOMInputStream ubis = new UnicodeBOMInputStream(fis);
+	         ubis.skipBOM();
+	         xpp.setInput(new InputStreamReader(ubis));
+	         
+	         int eventType = xpp.getEventType();
 
-			try {
-				objNodeList = objDocPresXML.getElementsByTagName("Settings");
-				objSettings = (Element) objNodeList.item(0);
-				if (objSettings == null) {
-					blnAutoSetPage = true;
-				} else {
-					// AutoSetPageWhenSeen
-					objNodeList = objSettings.getElementsByTagName("AutoSetPageWhenSeen");
-					objAutoset = (Element) objNodeList.item(0);
+	         while (eventType != XmlPullParser.END_DOCUMENT) {
+	        	 switch (eventType) {
+	        	 case XmlPullParser.START_DOCUMENT:
+	        		 Log.d(TAG, "loadXML Start document " + strPreXMLPath);
+	        		 break;
+	        	 case XmlPullParser.END_DOCUMENT:
+	        		 Log.d(TAG, "loadXML End document");
+	        		 break;
+	        	 case XmlPullParser.START_TAG:
+	        		 Log.d(TAG, "loadXML Start tag " + xpp.getName());
+	        		 strTag = xpp.getName();
 
-					if (objAutoset == null) {
-						blnAutoSetPage = true;
-					} else {
-						blnAutoSetPage = Boolean.parseBoolean(objAutoset.getFirstChild().getNodeValue());
-					}
-				}
-			} catch (Exception e1) {
-				blnAutoSetPage = true;
-				Log.e(TAG, "loadXML Settings Exception " + e1.getLocalizedMessage());
-			}
+	        		 switch (TagName.toTag(strTag)) {
+	        		 case Title:
+	        			 try {
+	        				 xpp.next();
+	        				 strTmpTitle = xpp.getText();
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Title Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Audio:
+	        			 try {
+	        				 String strId;
+	        				 String strStartAt;
+	        				 String strStopAt;
+	        				 String strTarget;
+	        				 strTarget = xpp.getAttributeValue(null, "target");
+	        				 if (strTarget == null) strTarget = "";
+	        				 strStartAt = xpp.getAttributeValue(null, "start-at");
+	        				 if (strStartAt == null) strStartAt = "";
+	        				 strStopAt = xpp.getAttributeValue(null, "stop-at");
+	        				 if (strStopAt == null) strStopAt = "";
+	        				 strId = xpp.getAttributeValue(null, "id");
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 audio iaudio = new audio(strId, strStartAt, strStopAt, strTarget, strTarget, ifSet, ifNotSet, "", "");
+	        				 Ipage.addAudio(iaudio);
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Audio Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Author:
+	        			 try {
+	        				 int eventType2 = xpp.getEventType();
+	        				 while (true) {
+	        					 if (eventType2 == XmlPullParser.START_TAG) {
+	        						 if (xpp.getName().equals("Name")) {
+	        							 xpp.next();
+	        							 strTmpAuthor = xpp.getText();
+	        						 }
+	        					 }
+	        					 eventType2 = xpp.next();
+	        					 if (eventType2 == XmlPullParser.END_TAG) {
+	        						 if (xpp.getName().equals("Author")) break;
+	        					 }
+	        				 }
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Author Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Button:
+	        			 try {
+	        				 String strTarget;
+	        				 strTarget = xpp.getAttributeValue(null, "target");
+	        				 if (strTarget == null) strTarget = "";
+	        				 Set = xpp.getAttributeValue(null, "set");
+	        				 if (Set == null) Set = "";
+	        				 UnSet = xpp.getAttributeValue(null, "unset");
+	        				 if (UnSet == null) UnSet = "";
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 xpp.next();
+	        				 button ibutton = new button(strTarget, xpp.getText(), ifSet, ifNotSet, Set, UnSet);
+	        				 Ipage.addButton(ibutton);
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Button Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Delay:
+	        			 try {
+	        				 String strSeconds;
+	        				 String strStartWith;
+	        				 String strStyle;
+	        				 String strTarget;
+	        				 strTarget = xpp.getAttributeValue(null, "target");
+	        				 if (strTarget == null) strTarget = "";
+	        				 strStartWith = xpp.getAttributeValue(null, "start-with");
+	        				 if (strStartWith == null) strStartWith = "";
+	        				 strStyle = xpp.getAttributeValue(null, "style");
+	        				 if (strStyle == null) strStyle = "";
+	        				 strSeconds = xpp.getAttributeValue(null, "seconds");
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 Set = xpp.getAttributeValue(null, "set");
+	        				 if (Set == null) Set = "";
+	        				 UnSet = xpp.getAttributeValue(null, "unset");
+	        				 if (UnSet == null) UnSet = "";
+	        				 delay idelay = new delay(strTarget, strSeconds, ifSet, ifNotSet, strStartWith, strStyle, Set, UnSet);
+	        				 Ipage.addDelay(idelay);
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Delay Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Image:
+	        			 try {
+	        				 String strImage;
+	        				 strImage = xpp.getAttributeValue(null, "id");
+	        				 if (strImage == null) strImage = "";
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 if (!strImage.equals("")){
+	        					 image Iimage = new image(strImage, ifSet, ifNotSet);
+	        					 Ipage.addImage(Iimage);
+	        				 }
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Image Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case MediaDirectory:
+	        			 try {
+	        				 xpp.next();
+	        				 strMediaDirectory = xpp.getText();
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML MediaDirectory Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Metronome:
+	        			 try {
+	        				 String strbpm;
+	        				 strbpm = xpp.getAttributeValue(null, "bpm");
+	        				 if (strbpm == null) strbpm = "";
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 if (!strbpm.equals("")) {
+	        					 metronome Imetronome = new metronome(strbpm, ifSet, ifNotSet);
+	        					 Ipage.addMetronome(Imetronome);
+	        				 }
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Metronome Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case NOVALUE:
+	        			 break;
+	        		 case Page:
+	        			 try {
+	        				 pageName = xpp.getAttributeValue(null, "id");
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 Set = xpp.getAttributeValue(null, "set");
+	        				 if (Set == null) Set = "";
+	        				 UnSet = xpp.getAttributeValue(null, "unset");
+	        				 if (UnSet == null) UnSet = "";
+	        				 Ipage = new page(pageName, ifSet, ifNotSet, Set, UnSet, blnAutoSetPage); 
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Page Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Settings:
+	        			 try {
+	        				 int eventType2 = xpp.getEventType();
+	        				 while (true) {
+	        					 if (eventType2 == XmlPullParser.START_TAG) {
+	        						 if (xpp.getName().equals("AutoSetPageWhenSeen")) {
+	        							 xpp.next();
+	        							 blnAutoSetPage = Boolean.parseBoolean(xpp.getText());
+	        						 }	        				 
+	        					 }
+        						 eventType2 = xpp.next();
+        						 if (eventType2 == XmlPullParser.END_TAG) {
+        							 if (xpp.getName().equals("Settings")) break;
+        						 }
+	        				 }
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Settings Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Text:
+	        			 try {
+	        				 if (xpp.getName().equals("Text")) {
+	        					 String text = "";
+	        					 String tag = "";
+	        					 int eventType2 = xpp.next();
+	        					 while (true) {
+	        						 switch (eventType2) {
+	        						 case XmlPullParser.START_TAG:
+	        							 tag = xpp.getName();
+	        							 text = text + "<" + tag;
+	        							 for (int i=0; i < xpp.getAttributeCount(); i++) {
+	        								 text = text + " " + xpp.getAttributeName(i) + "=\"" + xpp.getAttributeValue(i) + "\"";
+	        							 }
+	        							 text = text + ">";
+	        							 break;
+	        						 case XmlPullParser.END_TAG:
+	        							 text = text + "</"  + tag + ">";
+	        							 break;
+	        						 case XmlPullParser.TEXT:
+	        							 text = text + xpp.getText();
+	        							 break;
+	        						 }
+	        						 eventType2 = xpp.next();
+	        						 if (eventType2 == XmlPullParser.END_TAG) {
+	        							 if (xpp.getName().equals("Text")) break;
+	        						 }
+	        					 }
+	        					 Ipage.setText(text);
+	        				 }
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Text Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 case Video:
+	        			 try {
+	        				 String strId;
+	        				 String strStartAt;
+	        				 String strStopAt;
+	        				 String strTarget;
+	        				 strTarget = xpp.getAttributeValue(null, "target");
+	        				 if (strTarget == null) strTarget = "";
+	        				 strStartAt = xpp.getAttributeValue(null, "start-at");
+	        				 if (strStartAt == null) strStartAt = "";
+	        				 strStopAt = xpp.getAttributeValue(null, "stop-at");
+	        				 if (strStopAt == null) strStopAt = "";
+	        				 strId = xpp.getAttributeValue(null, "id");
+	        				 ifSet = xpp.getAttributeValue(null, "if-set");
+	        				 if (ifSet == null) ifSet = "";
+	        				 ifNotSet = xpp.getAttributeValue(null, "if-not-set"); 
+	        				 if (ifNotSet == null) ifNotSet = "";
+	        				 video ivideo = new video(strId, strStartAt, strStopAt, strTarget, ifSet, ifNotSet, "", "", "");
+	        				 Ipage.addVideo(ivideo);
+	        			 } catch (Exception e1) {
+	        				 Log.e(TAG, "loadXML Video Exception " + e1.getLocalizedMessage());
+	        			 }
+	        			 break;
+	        		 default:
+	        			 break;
+	        		 }
+	        		 break;
+	        	 case XmlPullParser.END_TAG:
+	        		 Log.d(TAG, "loadXML End tag " + xpp.getName());
+	        		 try {
+	        			 if (xpp.getName().equals("Page")) {
+	        				 Ipages.put(Ipage.getPageName(), Ipage);
+	        			 }
+	        		 } catch (Exception e1) {
+	        			 Log.e(TAG, "loadXML EndPage Exception " + e1.getLocalizedMessage());
+	        		 }
+	        		 break;
+	        	 case XmlPullParser.TEXT:
+	        		 break;
+	        	 }
+
+	        	 eventType = xpp.next();
+	         }
+	         
+			strTitle = strTmpTitle + ", " + strTmpAuthor;
+
+			//Metronome sound
+			soundPool = null;
+			soundPool = new SoundPool(1, AudioManager.STREAM_MUSIC, 0);
+			sound = soundPool.load(this, R.raw.tick, 1);
 
 			// Return to where we left off
 			strPage = "start";
@@ -1293,75 +1530,14 @@ public class AndroidTeaseMeActivity extends Activity {
 				strPage = objLocalVarianbles.getString("CurrentPage", "start");
 				strFlags = objLocalVarianbles.getString("Flags", "");
 				if (strFlags != "") {
-					SetFlags(strFlags);
+					comFun.SetFlags(strFlags, Flags);
 				}
 			} catch (Exception e1) {
 				Log.e(TAG, "loadXML Continue Exception " + e1.getLocalizedMessage());
 			}
 
-			// Title
-			try {
-				objNodeList = objDocPresXML.getElementsByTagName("Title");
-				objTitle = (Element) objNodeList.item(0);
-				if (objTitle == null) {
-					strTmpTitle = "";
-				} else {
-					objTemp = objTitle.getFirstChild();
-					if (objTemp == null) {
-						strTmpTitle = "";
-					} else {
-						strTmpTitle = objTitle.getFirstChild().getNodeValue();
-					}
-				}
-			} catch (Exception e1) {
-				strTmpTitle = "";
-				Log.e(TAG, "loadXML Title Exception " + e1.getLocalizedMessage());
-			}
-
-			// Author
-			try {
-				objNodeList = objDocPresXML.getElementsByTagName("Author");
-				objAuthor = (Element) objNodeList.item(0);
-				if (objAuthor == null) {
-					strTmpAuthor = "";
-				} else {
-					objNodeList = objAuthor.getElementsByTagName("Name");
-					objAuthor = (Element) objNodeList.item(0);
-					if (objAuthor == null) {
-						strTmpAuthor = "";
-					} else {
-						objTemp = objAuthor.getFirstChild();
-						if (objTemp == null) {
-							strTmpAuthor = "";
-						} else {
-							strTmpAuthor = objAuthor.getFirstChild().getNodeValue();
-						}
-					}
-				}
-			} catch (Exception e1) {
-				strTmpAuthor = "";
-				Log.e(TAG, "loadXML Author Exception " + e1.getLocalizedMessage());
-			}
-
-			strTitle = strTmpTitle + ", " + strTmpAuthor;
-
-			// Media directory
-			objNodeList = objDocPresXML.getElementsByTagName("MediaDirectory");
-			objMediaElement = (Element) objNodeList.item(0);
-			strMediaDirectory = objMediaElement.getFirstChild().getNodeValue();
-
-			// Node holding all pages
-			objNodeList = objDocPresXML.getElementsByTagName("Pages");
-			objPagesElement = (Element) objNodeList.item(0);
-
-			//Metronome sound
-			soundPool = null;
-			soundPool = new SoundPool(1, AudioManager.STREAM_MUSIC, 0);
-			sound = soundPool.load(this, R.raw.tick, 1);
-		} catch (ParserConfigurationException e) {
-			Log.e(TAG, "loadXML ParserConfigurationException ", e);
-		} catch (SAXException e) {
-			Log.e(TAG, "loadXML SAXException ", e);
+		} catch (org.xmlpull.v1.XmlPullParserException e) {
+			Log.e(TAG, "loadXML XmlPullParserException ", e);
 		} catch (IOException e) {
 			Log.e(TAG, "loadXML IOException ", e);
 		} catch (Exception e) {
@@ -1370,6 +1546,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		return strPage;
 	}
 
+	/*
 	private String getInnerXml(Node objXMLNode, boolean blnTopNode) {
 		// Helper function to return the xml below a node as text
 		// Used to get the html from the text node as a string
@@ -1417,6 +1594,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		}
 		return strXML;
 	}
+	*/
 
 	// delay timer
 	class PageTimer extends CountDownTimer {
@@ -1425,8 +1603,6 @@ public class AndroidTeaseMeActivity extends Activity {
 		public PageTimer(long millisInFuture, long offset, long countDownInterval) {
 			super(millisInFuture, countDownInterval);
 			lngStartOffset = offset;
-			//Long tmpLong = (Long) millisInFuture / 1000;
-			//objCountText.setText(tmpLong.toString());
 		}
 
 		// display the target page
@@ -1437,11 +1613,11 @@ public class AndroidTeaseMeActivity extends Activity {
 				// do set / unset
 				if (!strDelaySet.equals("")) {
 					Log.d(TAG, "PageTimer  onFinish Set Flags " + strDelaySet);
-					SetFlags(strDelaySet);
+					comFun.SetFlags(strDelaySet, Flags);
 				}
 				if (!strDelayUnSet.equals("")) {
 					Log.d(TAG, "PageTimer  onFinish UnSet Flags " + strDelayUnSet);
-					UnsetFlags(strDelayUnSet);
+					comFun.UnsetFlags(strDelayUnSet, Flags);
 				}
 				Log.d(TAG, "PageTimer  onFinish Target " + strDelTarget);
 				displayPage(strDelTarget, false);
@@ -1632,25 +1808,6 @@ public class AndroidTeaseMeActivity extends Activity {
 		public boolean accept(File f) {
 			try {
 				String strPattern = strFilePatern.toLowerCase();
-				/*
-				String[] cards = strPattern.split("\\*");
-				String text = f.getName().toLowerCase();
-				String strFile = text;
-
-				// Iterate over the cards.
-				for (String card : cards) {
-					int idx = text.indexOf(card);
-
-					// Card not detected in the text.
-					if (idx == -1) {
-						Log.d(TAG, "WildCardFileFilter accept No Match " + strFile);
-						return false;
-					}
-
-					// Move ahead, towards the right of the text.
-					text = text.substring(idx + card.length());
-				}
-				*/
 				String text = f.getName().toLowerCase();
 				String strFile = text;
 				strPattern = strPattern.replace("*", ".*");
@@ -1702,18 +1859,11 @@ public class AndroidTeaseMeActivity extends Activity {
 				fltRatio = (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
 				fltScrnRatio = (float) reqHeight / (float) reqWidth;
 				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio);
-				/*if (fltScrnRatio > fltRatio) {
-					// portrait
-					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, false);
+				if (fltScrnRatio > fltRatio) {
+					objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), true);
 				} else {
-				*/
-					// landscape
-					if (fltScrnRatio > fltRatio) {
-						objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), true);
-					} else {
-						objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, true);
-					}
-				//}
+					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, true);
+				}
 				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio + " BitMap Height " + objBitMap.getHeight() + " width " + objBitMap.getWidth());
 			} catch (Exception e) {
 				Log.e(TAG, "calculateInSampleSize Exception ", e);
@@ -1736,181 +1886,5 @@ public class AndroidTeaseMeActivity extends Activity {
 		return outputimage;
 	}
 
-	// functions to handle set flags go here
-	private void SetFlags(String flagNames) {
-		String[] flags;
-		try {
-			flags = flagNames.split(",", -1);
-			Log.d(TAG, "SetFlags before " + Flags + " add " + flagNames);
-			for (int i = 0; i < flags.length; i++) {
-				if (!Flags.contains(flags[i])) {
-					Flags.add(flags[i]);
-				}
-			}
-			Log.d(TAG, "SetFlags after " + Flags);
-		} catch (Exception e) {
-			Log.e(TAG, "SetFlags Exception ", e);
-		}
-	}
-
-	private String GetFlags() {
-		String strFlags = "";
-		try {
-			for (int i = 0; i < Flags.size(); i++) {
-				strFlags = strFlags + "," + Flags.get(i);
-			}
-
-		} catch (Exception e) {
-			Log.e(TAG, "SetFlags Exception ", e);
-		}
-		Log.d(TAG, "GetFlags " + strFlags);
-		return strFlags;
-	}
-
-	private void UnsetFlags(String flagNames) {
-		String[] flags;
-		try {
-			flags = flagNames.split(",", -1);
-			Log.d(TAG, "UnsetFlags remove " + Flags + " add " + flagNames);
-			for (int i = 0; i < flags.length; i++) {
-				if (Flags.contains(flags[i]) && !flags[i].equals("")) {
-					Flags.remove(flags[i]);
-				}
-			}
-			flags = flagNames.split(",", -1);
-			Log.d(TAG, "UnsetFlags after " + Flags);
-		} catch (Exception e) {
-			Log.e(TAG, "UnsetFlags Exception ", e);
-		}
-	}
-
-	private boolean MatchesIfSetCondition(String condition) {
-		boolean blnReturn = false;
-		boolean blnAnd = false;
-		boolean blnOr = false;
-		String[] conditions;
-
-		Log.d(TAG, "MatchesIfSetCondition flags " + Flags + " condition " + condition);
-		try {
-			if (condition.indexOf("|") > -1) {
-				blnOr = true;
-				condition = condition.replace("|", ",");
-				conditions = condition.split(",", -1);
-				for (int i = 0; i < conditions.length; i++) {
-					if (Flags.contains(conditions[i])) {
-						blnReturn = true;
-						break;
-					}
-				}
-			}
-
-			if (condition.indexOf("+") > -1) {
-				blnAnd = true;
-				blnReturn = true;
-				condition = condition.replace("+", ",");
-				conditions = condition.split(",", -1);
-				for (int i = 0; i < conditions.length; i++) {
-					if (!Flags.contains(conditions[i])) {
-						blnReturn = false;
-						break;
-					}
-				}
-			}
-
-			if (!blnAnd && !blnOr) {
-				blnReturn = Flags.contains(condition);
-			}
-		} catch (Exception e) {
-			Log.e(TAG, "MatchesIfSetCondition Exception ", e);
-		}
-
-		Log.d(TAG, "MatchesIfSetCondition returned " + blnReturn);
-		return blnReturn;
-	}
-
-	private boolean MatchesIfNotSetCondition(String condition) {
-		boolean blnReturn = false;
-		boolean blnAnd = false;
-		boolean blnOr = false;
-		String[] conditions;
-
-		Log.d(TAG, "MatchesIfNotSetCondition flags " + Flags + " condition " + condition);
-		try {
-			if (condition.indexOf("+") > -1) {
-				blnAnd = true;
-				blnReturn = true;
-				condition = condition.replace("+", ",");
-				conditions = condition.split(",", -1);
-				for (int i = 0; i < conditions.length; i++) {
-					if (Flags.contains(conditions[i])) {
-						blnReturn = false;
-						break;
-					}
-				}
-			}
-
-			if (condition.indexOf("|") > -1) {
-				blnOr = true;
-				condition = condition.replace("|", ",");
-				conditions = condition.split(",", -1);
-				for (int i = 0; i < conditions.length; i++) {
-					if (!Flags.contains(conditions[i])) {
-						blnReturn = true;
-						break;
-					}
-				}
-			}
-
-			if (!blnAnd && !blnOr) {
-				blnReturn = !Flags.contains(condition);
-			}
-		} catch (Exception e) {
-			Log.e(TAG, "MatchesIfNotSetCondition Exception ", e);
-		}
-
-		Log.d(TAG, "MatchesIfNotSetCondition returned " + blnReturn);
-		return blnReturn;
-	}
-
-	private boolean AllowedToShowPage(String pageId) {
-		NodeList pageNodeList = objPagesElement.getElementsByTagName("Page");
-		Element elPage;
-		String strTest;
-		boolean blnCanShow = false;
-		boolean blnSet = true;
-		boolean blnNotSet = true;
-
-		Log.d(TAG, "AllowedToShowPage " + pageId);
-
-		try {
-			// loop through till we find the page
-			for (int i = 0; i < pageNodeList.getLength(); i++) {
-				elPage = (Element) pageNodeList.item(i);
-				String strId = elPage.getAttribute("id");
-				if (strId.equals(pageId)) {
-					// found the page so check it
-					Log.d(TAG, "AllowedToShowPage found " + pageId);
-					strTest = elPage.getAttribute("if-set");
-					if (!strTest.equals("")) {
-						blnSet = MatchesIfSetCondition(strTest);
-					}
-					strTest = elPage.getAttribute("if-not-set");
-					if (!strTest.equals("")) {
-						blnNotSet = MatchesIfNotSetCondition(strTest);
-					}
-					if (blnSet && blnNotSet) {
-						blnCanShow = MatchesIfNotSetCondition(pageId);
-					} else {
-						blnCanShow = false;
-					}
-					break;
-				}
-			}
-		} catch (Exception e) {
-			Log.e(TAG, "AllowedToShowPage Exception ", e);
-		}
-		Log.d(TAG, "AllowedToShowPage returned " + blnCanShow);
-		return blnCanShow;
-	}
 	
 }
