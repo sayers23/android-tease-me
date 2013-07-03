@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string-array name="LoadSortName">
+        <item name="FileName">By file name</item>
+        <item name="FileDate">By file date</item>
+        <item name="FileSize">By file size</item>
+        </string-array>
+    <string-array name="LoadSortValue">
+        <item name="FileName">NAME</item>
+        <item name="FileDate">DATE</item>
+        <item name="FileSize">SIZE</item>
+        </string-array>
+
+</resources>
