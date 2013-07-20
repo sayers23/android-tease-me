@@ -1,9 +1,11 @@
 package uk.co.ormand.teaseme;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import android.media.SoundPool;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.CountDownTimer;
+import android.os.Handler;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
@@ -107,6 +110,14 @@ public class AndroidTeaseMeActivity extends Activity {
 	private comonFunctions comFun = new comonFunctions(TAG);
 	private HashMap<String, page> Ipages = new HashMap<String, page>(); 
 	private VideoView objVideoView;
+	private GifDecoder mGifDecoder;    
+	private Bitmap mTmpBitmap;
+	final Handler mHandler = new Handler(); 
+	ImageView objImageView;
+	File flImage = null;
+	private Boolean blnShowGif = false;
+	private String strCurrentGif = "";
+	private String imgPath = "";
 
 	// TODO about
 	// TODO vote
@@ -523,6 +534,7 @@ public class AndroidTeaseMeActivity extends Activity {
 		String strDelStartAt;
 		int intDelStartAt;
 		int intStartAt;
+		// TODO stop at
 		int intStopAt;
 		boolean blnVideo;
 		boolean blnDelay;
@@ -531,8 +543,6 @@ public class AndroidTeaseMeActivity extends Activity {
 		LinearLayout btnLayoutRow2 = null;
 		LinearLayout.LayoutParams btnLayoutParm;
 		ViewGroup.LayoutParams layout;
-		ImageView objImageView;
-		String imgPath = null;
 		String strFlags;
 		page objCurrPage;
 		delay objDelay;
@@ -568,6 +578,8 @@ public class AndroidTeaseMeActivity extends Activity {
 				if (objVideoView != null) {
 					objVideoView.stopPlayback();
 				}
+				
+				blnShowGif = false;
 			}
 
 			// handle random page
@@ -710,8 +722,41 @@ public class AndroidTeaseMeActivity extends Activity {
 							}
 
 
-							imgPath = strPresentationPath + strMediaDirectory + "/" + strImage;
-							Log.d(TAG, "displayPage Video full path " + imgPath);
+							strImage = strImage.replace("\\", "/");
+							Log.d(TAG, "displayPage Video " + strImage);
+							int intSubDir = strImage.lastIndexOf("/");
+							String strSubDir;
+							if (intSubDir > -1) {
+								strSubDir = strImage.substring(0, intSubDir + 1);
+								if (!strSubDir.startsWith("/")) {
+									strSubDir = "/" + strSubDir;
+								}
+								strImage = strImage.substring(intSubDir + 1);
+							} else {
+								strSubDir = "/";
+							}
+							// String strSubDir
+							// Handle wildcard *
+							if (strImage.indexOf("*") > -1) {
+								strFilePatern = strImage;
+								// get the directory
+								File f = new File(strPresentationPath + strMediaDirectory + strSubDir);
+								// wildcard filter class handles the filtering
+								java.io.FileFilter WildCardfilter = new WildCardFileFilter();
+								if (f.isDirectory()) {
+									// return a list of matching files
+									File[] children = f.listFiles(WildCardfilter);
+									// return a random image
+									int intFile = rndGen.nextInt(children.length);
+									Log.d(TAG, "displayPage Random Video Index " + intFile);
+									imgPath = strPresentationPath + strMediaDirectory + strSubDir + children[intFile].getName();
+									Log.d(TAG, "displayPage Random Video Chosen " + imgPath);
+								}
+							} else {
+								// no wildcard so just use the file name
+								imgPath = strPresentationPath + strMediaDirectory + strSubDir + strImage;
+								Log.d(TAG, "displayPage Non Random Video " + imgPath);
+							}
 							objVideoView = new VideoView(this);
 							objLayoutImage.removeAllViews();
 							objLayoutImage.addView(objVideoView);
@@ -760,6 +805,9 @@ public class AndroidTeaseMeActivity extends Activity {
 								String strSubDir;
 								if (intSubDir > -1) {
 									strSubDir = strImage.substring(0, intSubDir + 1);
+									if (!strSubDir.startsWith("/")) {
+										strSubDir = "/" + strSubDir;
+									}
 									strImage = strImage.substring(intSubDir + 1);
 								} else {
 									strSubDir = "/";
@@ -786,67 +834,206 @@ public class AndroidTeaseMeActivity extends Activity {
 									imgPath = strPresentationPath + strMediaDirectory + strSubDir + strImage;
 									Log.d(TAG, "displayPage Non Random Image " + imgPath);
 								}
-								File flImage = new File(imgPath);
+								flImage = new File(imgPath);
 								if (flImage.exists()){
 									try {
-										if (blnImageBackground) {
-											// decodeSampledBitmapFromFile will resize the
-											// image
-											// before it gets to memory
-											// we can load large images using memory
-											// efficiently
-											// (and not run out of memory and crash the app)
-
-											// Clear the parent layout
-											objLayoutImage.removeAllViews();
-											Bitmap objRetBitMap;
-											objRetBitMap = decodeSampledBitmapFromFile(imgPath, intWidthTop, intHeightTop);
-											int intHeightPad = 0;
-											int intWidthPad = 0;
-											if (objRetBitMap.getHeight() < intHeightTop) {
-												intHeightPad = intHeightTop - objRetBitMap.getHeight();
+										if (imgPath.toLowerCase().endsWith(".gif")) {
+											if (blnImageBackground) {
+												objLayoutImage.removeAllViews();
+												new Thread(new Runnable() { 
+													public void run() { 
+														try {
+															String MyGif = imgPath;
+															strCurrentGif = imgPath;
+															if (mGifDecoder != null) {
+																mGifDecoder = null;
+																System.gc();
+															}
+															InputStream stream = null; 
+															try { 
+																stream =  new BufferedInputStream(new FileInputStream(flImage)); 
+															} 
+															catch (IOException e) { 
+																e.printStackTrace(); 
+															}
+															mGifDecoder = new GifDecoder();
+															mGifDecoder.read(stream);
+															final int n = mGifDecoder.getFrameCount(); 
+															final int ntimes = mGifDecoder.getLoopCount(); 
+															int repetitionCounter = 0; 
+															blnShowGif = true;
+															do { 
+																for (int i = 0; i < n; i++) { 
+																	if (blnShowGif && MyGif.equals(imgPath)) {
+																		mTmpBitmap = mGifDecoder.getFrame(i); 
+																		mTmpBitmap = resizeBitmap(mTmpBitmap, intWidthTop, intHeightTop);
+																		final int t = mGifDecoder.getDelay(i); 
+																		int intHeightPad = 0;
+																		int intWidthPad = 0;
+																		if (mTmpBitmap.getHeight() < intHeightTop) {
+																			intHeightPad = intHeightTop - mTmpBitmap.getHeight();
+																		}
+																		if (mTmpBitmap.getWidth() < intWidthTop) {
+																			intWidthPad = intWidthTop - mTmpBitmap.getWidth();
+																		}
+																		Log.d(TAG, "displayPage Pad Image screen height " + intHeightTop);
+																		Log.d(TAG, "displayPage Pad Image screen width " + intWidthTop);
+																		Log.d(TAG, "displayPage Pad Image bitmap height " + mTmpBitmap.getHeight());
+																		Log.d(TAG, "displayPage Pad Image bitmap width " + mTmpBitmap.getWidth());
+																		Log.d(TAG, "displayPage Pad Image pad height " + intHeightPad);
+																		Log.d(TAG, "displayPage Pad Image pad width " + intWidthPad);
+																		if (intHeightPad != 0 || intWidthPad != 0) {
+																			mTmpBitmap = pad(mTmpBitmap, intWidthPad, intHeightPad);
+																		}
+																		mHandler.post(mUpdateResults2); 
+																		try { 
+																			Thread.sleep(t); 
+																		} 
+																		catch (InterruptedException e) { 
+																			e.printStackTrace();
+																		} 
+																	}
+																} 
+																if(ntimes != 0) { 
+																	repetitionCounter ++; 
+																} 
+															} while ((repetitionCounter <= ntimes) && blnShowGif && MyGif.equals(imgPath));
+															MyGif = null;
+															stream = null;
+														} catch (Exception e) {
+															Log.e(TAG, "Gif Background Exception " + e.getLocalizedMessage());
+														}
+													}      
+												}).start();
+											} else {
+												// we create a new image view every time (we may
+												// have
+												// displayed a video last time)
+												objImageView = new ImageView(this);
+												// Clear the parent layout
+												objLayoutImage.removeAllViews();
+												objLayoutTop.setBackgroundDrawable(null);
+												// add the new image to it and set it to fill
+												// the
+												// available area
+												objLayoutImage.addView(objImageView);
+												layout = objImageView.getLayoutParams();
+												layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+												layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+												objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+												objImageView.setLayoutParams(layout);
+												blnImageZoomed = false;
+												new Thread(new Runnable() { 
+													public void run() { 
+														try {
+															String MyGif = imgPath;
+															strCurrentGif = imgPath;
+															if (mGifDecoder != null) {
+																mGifDecoder = null;
+																System.gc();
+															}
+															InputStream stream = null; 
+															try { 
+																stream =  new BufferedInputStream(new FileInputStream(flImage)); 
+															} 
+															catch (IOException e) { 
+																e.printStackTrace(); 
+															}
+															mGifDecoder = new GifDecoder();
+															mGifDecoder.read(stream);
+															final int n = mGifDecoder.getFrameCount(); 
+															final int ntimes = mGifDecoder.getLoopCount(); 
+															int repetitionCounter = 0; 
+															blnShowGif = true;
+															do { 
+																for (int i = 0; i < n; i++) { 
+																	if (blnShowGif && MyGif.equals(imgPath)) {
+																		mTmpBitmap = mGifDecoder.getFrame(i); 
+																		mTmpBitmap = resizeBitmap(mTmpBitmap,  intWidthTop / 2, intHeightTop);
+																		final int t = mGifDecoder.getDelay(i); 
+																		mHandler.post(mUpdateResults); 
+																		try { 
+																			Thread.sleep(t); 
+																		} 
+																		catch (InterruptedException e) { 
+																			e.printStackTrace();
+																		} 
+																	}
+																} 
+																if(ntimes != 0) { 
+																	repetitionCounter ++; 
+																} 
+															} while ((repetitionCounter <= ntimes) && blnShowGif && MyGif.equals(imgPath)); 
+															MyGif = null;
+															stream = null;
+														} catch (Exception e) {
+															Log.e(TAG, "Gif ImageView Exception " + e.getLocalizedMessage());
+														}
+													}      
+												}).start();
+												
 											}
-											if (objRetBitMap.getWidth() < intWidthTop) {
-												intWidthPad = intWidthTop - objRetBitMap.getWidth();
-											}
-											Log.d(TAG, "displayPage Pad Image screen height " + intHeightTop);
-											Log.d(TAG, "displayPage Pad Image screen width " + intWidthTop);
-											Log.d(TAG, "displayPage Pad Image bitmap height " + objRetBitMap.getHeight());
-											Log.d(TAG, "displayPage Pad Image bitmap width " + objRetBitMap.getWidth());
-											Log.d(TAG, "displayPage Pad Image pad height " + intHeightPad);
-											Log.d(TAG, "displayPage Pad Image pad width " + intWidthPad);
-											if (intHeightPad != 0 || intWidthPad != 0) {
-												objRetBitMap = pad(objRetBitMap, intWidthPad, intHeightPad);
-											}
-											Drawable objDrawable = new BitmapDrawable(objRetBitMap);
-											objLayoutTop.setBackgroundDrawable(objDrawable);
+											
 										} else {
-											// we create a new image view every time (we may
-											// have
-											// displayed a video last time)
-											objImageView = new ImageView(this);
-											// decodeSampledBitmapFromFile will resize the
-											// image
-											// before it gets to memory
-											// we can load large images using memory
-											// efficiently
-											// (and not run out of memory and crash the app)
+											if (blnImageBackground) {
+												// decodeSampledBitmapFromFile will resize the
+												// image
+												// before it gets to memory
+												// we can load large images using memory
+												// efficiently
+												// (and not run out of memory and crash the app)
 
-											objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
-											// Clear the parent layout
-											objLayoutImage.removeAllViews();
-											objLayoutTop.setBackgroundDrawable(null);
-											// add the new image to it and set it to fill
-											// the
-											// available area
-											objLayoutImage.addView(objImageView);
-											layout = objImageView.getLayoutParams();
-											layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
-											layout.height = ViewGroup.LayoutParams.FILL_PARENT;
-											objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-											objImageView.setLayoutParams(layout);
-											objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
-											blnImageZoomed = false;
+												// Clear the parent layout
+												objLayoutImage.removeAllViews();
+												Bitmap objRetBitMap;
+												objRetBitMap = decodeSampledBitmapFromFile(imgPath, intWidthTop, intHeightTop);
+												int intHeightPad = 0;
+												int intWidthPad = 0;
+												if (objRetBitMap.getHeight() < intHeightTop) {
+													intHeightPad = intHeightTop - objRetBitMap.getHeight();
+												}
+												if (objRetBitMap.getWidth() < intWidthTop) {
+													intWidthPad = intWidthTop - objRetBitMap.getWidth();
+												}
+												Log.d(TAG, "displayPage Pad Image screen height " + intHeightTop);
+												Log.d(TAG, "displayPage Pad Image screen width " + intWidthTop);
+												Log.d(TAG, "displayPage Pad Image bitmap height " + objRetBitMap.getHeight());
+												Log.d(TAG, "displayPage Pad Image bitmap width " + objRetBitMap.getWidth());
+												Log.d(TAG, "displayPage Pad Image pad height " + intHeightPad);
+												Log.d(TAG, "displayPage Pad Image pad width " + intWidthPad);
+												if (intHeightPad != 0 || intWidthPad != 0) {
+													objRetBitMap = pad(objRetBitMap, intWidthPad, intHeightPad);
+												}
+												Drawable objDrawable = new BitmapDrawable(objRetBitMap);
+												objLayoutTop.setBackgroundDrawable(objDrawable);
+											} else {
+												// we create a new image view every time (we may
+												// have
+												// displayed a video last time)
+												objImageView = new ImageView(this);
+												// decodeSampledBitmapFromFile will resize the
+												// image
+												// before it gets to memory
+												// we can load large images using memory
+												// efficiently
+												// (and not run out of memory and crash the app)
+
+												objImageView.setImageBitmap(decodeSampledBitmapFromFile(imgPath, intWidthTop / 2, intHeightTop));
+												// Clear the parent layout
+												objLayoutImage.removeAllViews();
+												objLayoutTop.setBackgroundDrawable(null);
+												// add the new image to it and set it to fill
+												// the
+												// available area
+												objLayoutImage.addView(objImageView);
+												layout = objImageView.getLayoutParams();
+												layout.width = ViewGroup.LayoutParams.WRAP_CONTENT;
+												layout.height = ViewGroup.LayoutParams.FILL_PARENT;
+												objImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+												objImageView.setLayoutParams(layout);
+												objImageView.setOnClickListener(getOnClickDoZoomImage(objImageView, imgPath));
+												blnImageZoomed = false;
+											}
 										}
 									} catch (Exception e1) {
 										objLayoutImage.removeAllViews();
@@ -1093,16 +1280,19 @@ public class AndroidTeaseMeActivity extends Activity {
 										Log.d(TAG, "displayPage Audio " + strAudio);
 
 										strAudio = strAudio.replace("\\", "/");
-										Log.d(TAG, "displayPage Audio " + strAudio);
+										Log.d(TAG, "displayPage Video " + strAudio);
 										int intSubDir = strAudio.lastIndexOf("/");
 										String strSubDir;
 										if (intSubDir > -1) {
 											strSubDir = strAudio.substring(0, intSubDir + 1);
+											if (!strSubDir.startsWith("/")) {
+												strSubDir = "/" + strSubDir;
+											}
 											strAudio = strAudio.substring(intSubDir + 1);
 										} else {
 											strSubDir = "/";
 										}
-
+										// String strSubDir
 										// Handle wildcard *
 										if (strAudio.indexOf("*") > -1) {
 											strFilePatern = strAudio;
@@ -1113,18 +1303,18 @@ public class AndroidTeaseMeActivity extends Activity {
 											if (f.isDirectory()) {
 												// return a list of matching files
 												File[] children = f.listFiles(WildCardfilter);
-												// return a random sound
+												// return a random image
 												int intFile = rndGen.nextInt(children.length);
-												Log.d(TAG, "displayPage Random Audio Index " + intFile);
-												strAudio = strPresentationPath + strMediaDirectory + strSubDir + children[intFile].getName();
-												Log.d(TAG, "displayPage Random Audio Chosen " + imgPath);
+												Log.d(TAG, "displayPage Random Video Index " + intFile);
+												imgPath = strPresentationPath + strMediaDirectory + strSubDir + children[intFile].getName();
+												Log.d(TAG, "displayPage Random Video Chosen " + imgPath);
 											}
 										} else {
 											// no wildcard so just use the file name
-											strAudio = strPresentationPath + strMediaDirectory + strSubDir + "/" + strAudio;
-											Log.d(TAG, "displayPage Non Random Image " + imgPath);
+											imgPath = strPresentationPath + strMediaDirectory + strSubDir + strAudio;
+											Log.d(TAG, "displayPage Non Random Video " + imgPath);
 										}
-
+										strAudio = imgPath;
 										strAudioTarget = objAudio.getTarget();
 										Log.d(TAG, "displayPage Audio target " + strAudioTarget);
 										// run audio on another thread
@@ -1546,55 +1736,6 @@ public class AndroidTeaseMeActivity extends Activity {
 		return strPage;
 	}
 
-	/*
-	private String getInnerXml(Node objXMLNode, boolean blnTopNode) {
-		// Helper function to return the xml below a node as text
-		// Used to get the html from the text node as a string
-		String strXML;
-		String strTemp;
-		String strAttributes;
-		Node objTmpElement;
-		NodeList tmpNodeList;
-		NamedNodeMap objAttr;
-		Node objAttrNode;
-		strXML = "";
-		try {
-			if (objXMLNode != null) {
-				if (objXMLNode.getNodeType() == Node.ELEMENT_NODE) {
-					if (!blnTopNode) {
-						if (objXMLNode.hasAttributes()){
-							strAttributes = "";
-							objAttr = objXMLNode.getAttributes();
-							for (int i = 0; i < objAttr.getLength(); i++){
-								objAttrNode = objAttr.item(i);
-								strAttributes = strAttributes + " " + objAttrNode.getNodeName() + "=\"" + objAttrNode.getNodeValue() + "\"";
-							}
-						} else {
-							strAttributes = "";
-						}
-						strXML = "<" + objXMLNode.getNodeName() + strAttributes + ">";
-					}
-					tmpNodeList = objXMLNode.getChildNodes();
-					for (int i = 0; i < tmpNodeList.getLength(); i++) {
-						objTmpElement = tmpNodeList.item(i);
-						strXML = strXML + getInnerXml(objTmpElement, false);
-					}
-					if (!blnTopNode) {
-						strXML = strXML + "</" + objXMLNode.getNodeName() + ">";
-					}
-				}
-				if (objXMLNode.getNodeType() == Node.TEXT_NODE) {
-					strTemp = objXMLNode.getNodeValue();
-					strTemp = strTemp.replace("%", "&#37;");
-					strXML = strXML + strTemp;
-				}
-			}
-		} catch (Exception e) {
-			Log.e(TAG, "getInnerXml Exception ", e);
-		}
-		return strXML;
-	}
-	*/
 
 	// delay timer
 	class PageTimer extends CountDownTimer {
@@ -1826,7 +1967,7 @@ public class AndroidTeaseMeActivity extends Activity {
 	}
 
 	// return the image resized to the correct size to display
-	public static Bitmap decodeSampledBitmapFromFile(String strFile, int reqWidth, int reqHeight) {
+	public Bitmap decodeSampledBitmapFromFile(String strFile, int reqWidth, int reqHeight) {
 		try {
 
 			// First decode with inJustDecodeBounds=true to check dimensions
@@ -1834,8 +1975,6 @@ public class AndroidTeaseMeActivity extends Activity {
 			Bitmap objBitMap;
 			options.inJustDecodeBounds = true;
 			BitmapFactory.decodeFile(strFile, options);
-			float fltRatio;
-			float fltScrnRatio;
 
 			int inSampleSize = 1;
 			try {
@@ -1856,15 +1995,8 @@ public class AndroidTeaseMeActivity extends Activity {
 				options.inJustDecodeBounds = false;
 
 				objBitMap = BitmapFactory.decodeFile(strFile, options);
-				fltRatio = (float) objBitMap.getHeight() / (float) objBitMap.getWidth();
-				fltScrnRatio = (float) reqHeight / (float) reqWidth;
-				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio);
-				if (fltScrnRatio > fltRatio) {
-					objBitMap = Bitmap.createScaledBitmap(objBitMap, reqWidth, (int) (reqWidth * fltRatio), true);
-				} else {
-					objBitMap = Bitmap.createScaledBitmap(objBitMap, (int) (reqHeight / fltRatio), reqHeight, true);
-				}
-				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " fltRatio " + fltRatio + " BitMap Height " + objBitMap.getHeight() + " width " + objBitMap.getWidth());
+				objBitMap = resizeBitmap(objBitMap,reqWidth,reqHeight);
+				Log.d(TAG, "decodeSampledBitmapFromFile reqWidth " + reqWidth + " reqHeight " + reqHeight + " height " + height + " width " + width + " inSampleSize " + inSampleSize  + " BitMap Height " + objBitMap.getHeight() + " width " + objBitMap.getWidth());
 			} catch (Exception e) {
 				Log.e(TAG, "calculateInSampleSize Exception ", e);
 				return null;
@@ -1876,15 +2008,63 @@ public class AndroidTeaseMeActivity extends Activity {
 			return null;
 		}
 	}
+	
+	public Bitmap resizeBitmap(Bitmap bitmapin, int reqWidth, int reqHeight ){
+		try {
+			float fltRatio;
+			float fltScrnRatio;
+			fltRatio = (float) bitmapin.getHeight() / (float) bitmapin.getWidth();
+			fltScrnRatio = (float) reqHeight / (float) reqWidth;
+			if (fltScrnRatio > fltRatio) {
+				bitmapin = Bitmap.createScaledBitmap(bitmapin, reqWidth, (int) (reqWidth * fltRatio), true);
+			} else {
+				bitmapin = Bitmap.createScaledBitmap(bitmapin, (int) (reqHeight / fltRatio), reqHeight, true);
+			}
+			return bitmapin;
+		} catch (Exception e) {
+			Log.e(TAG, "resizeBitmap Exception ", e);
+			return bitmapin;
+		}
+	}
 
 	public Bitmap pad(Bitmap Src, int padding_x, int padding_y) {
-		Bitmap outputimage = Bitmap.createBitmap(Src.getWidth() + padding_x, Src.getHeight() + padding_y, Bitmap.Config.ARGB_8888);
-		Canvas can = new Canvas(outputimage);
-		can.drawARGB(0, 0, 0, 0);
-		can.drawBitmap(Src, (padding_x / 2), 0, null);
+		try {
+			Bitmap outputimage = Bitmap.createBitmap(Src.getWidth() + padding_x, Src.getHeight() + padding_y, Bitmap.Config.ARGB_8888);
+			Canvas can = new Canvas(outputimage);
+			can.drawARGB(0, 0, 0, 0);
+			can.drawBitmap(Src, (padding_x / 2), 0, null);
 
-		return outputimage;
+			return outputimage;
+		} catch (Exception e) {
+			Log.e(TAG, "pad Exception ", e);
+			return Src;
+		}
 	}
 
 	
+	final Runnable mUpdateResults = new Runnable() { 
+		public void run() { 
+			if (mTmpBitmap != null && !mTmpBitmap.isRecycled()) {
+				try {
+					objImageView.setImageBitmap(mTmpBitmap); 
+				} catch (Exception e) {
+					Log.e(TAG, "mUpdateResults Exception ", e);
+				}
+			} 
+		} 
+	};
+
+	final Runnable mUpdateResults2 = new Runnable() { 
+		public void run() { 
+			if (mTmpBitmap != null && !mTmpBitmap.isRecycled()) {
+				try {
+					Drawable objDrawable = new BitmapDrawable(mTmpBitmap);
+					objLayoutTop.setBackgroundDrawable(objDrawable);
+				} catch (Exception e) {
+					Log.e(TAG, "mUpdateResults Exception ", e);
+				}
+			}
+		}
+	};
+
 }
